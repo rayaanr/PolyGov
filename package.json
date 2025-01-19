@@ -1,0 +1,25 @@
+{
+    "name": "polygov",
+    "version": "1.0.0",
+    "main": "index.js",
+    "scripts": {
+        "test": "bunx hardhat test",
+        "compile": "bunx hardhat compile",
+        "typechain": "bunx hardhat typechain",
+        "deploy": "bunx hardhat run ./scripts/deploy.ts",
+        "node": "bunx hardhat node"
+    },
+    "keywords": [],
+    "author": "",
+    "license": "ISC",
+    "description": "",
+    "dependencies": {
+        "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+        "hardhat": "^2.22.18",
+        "ts-node": "^10.9.2",
+        "typescript": "^5.7.3"
+    },
+    "devDependencies": {
+        "@types/node": "^22.10.7"
+    }
+}
