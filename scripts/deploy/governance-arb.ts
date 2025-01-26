@@ -1,6 +1,6 @@
 import { deployAndVerify } from "./utils";
 import { Wallet } from "ethers";
-import { NETWORKS } from "../../constants/keys";
+import { KEYS } from "../../constants/keys";
 import { contracts } from "../../constants/contracts";
 import "dotenv/config";
 
@@ -27,7 +27,7 @@ async function main() {
     await deployAndVerify(
         "GovernanceARB",
         [pgvTokenAddress, relayerAddress], // Pass both arguments to the constructor
-        NETWORKS.ARBITRUM_TESTNET,
+        KEYS.ARB_TESTNET,
         "governanceContract"
     );
 }

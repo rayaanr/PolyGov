@@ -1,4 +1,4 @@
-import { NETWORKS } from "../../constants/keys";
+import { KEYS } from "../../constants/keys";
 import { deployAndVerify } from "./utils";
 import { contracts } from "../../constants/contracts";
 import "dotenv/config";
@@ -15,7 +15,7 @@ async function main() {
     await deployAndVerify(
         "GovernanceBSC",
         [pgvTokenAddress],
-        NETWORKS.BSC_TESTNET,
+        KEYS.BSC_TESTNET,
         "governanceContract"
     );
 }

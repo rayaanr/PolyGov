@@ -1,6 +1,6 @@
-export const NETWORKS = {
+export const KEYS = {
     BSC_TESTNET: "bscTestnet",
-    ARBITRUM_TESTNET: "arbitrumTestnet",
+    ARB_TESTNET: "arbitrumTestnet",
 } as const;
 
-export type Network = keyof typeof NETWORKS;
+export type Network = keyof typeof KEYS;
