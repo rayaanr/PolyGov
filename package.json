@@ -13,7 +13,8 @@
         "deploy:arb": "bunx hardhat run scripts/deploy/deploy-arb.ts --network arbitrumTestnet",
         "deploy:all": "bun run deploy:bsc && npm run deploy:arb",
         "verify-bsc": "bunx hardhat verify --network bscTestnet",
-        "verify-arb": "bunx hardhat verify --network arbitrumTestnet"
+        "verify-arb": "bunx hardhat verify --network arbitrumTestnet",
+        "relayer": "bunx ts-node --files relayer/relay.ts"
     },
     "keywords": [],
     "author": "",

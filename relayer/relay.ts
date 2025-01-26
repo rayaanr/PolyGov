@@ -18,7 +18,7 @@ async function main() {
     // Setup providers and signer
     const bscProvider = new ethers.JsonRpcProvider(CONFIG.BSC.RPC);
     const arbProvider = new ethers.JsonRpcProvider(CONFIG.ARB.RPC);
-    const signer = new ethers.Wallet(process.env.PRIVATE_KEY!, arbProvider);
+    const signer = new ethers.Wallet(process.env.RELAYER_PVT_KEY!, arbProvider);
 
     // Load contracts with any types
     const GovernanceBSC: any = new ethers.Contract(
