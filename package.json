@@ -22,6 +22,7 @@
         "@nomicfoundation/hardhat-toolbox": "^5.0.0",
         "@openzeppelin/contracts": "^5.2.0",
         "@types/dotenv": "^6.1.1",
+        "chalk": "^5.4.1",
         "dotenv": "^16.4.7",
         "hardhat": "^2.22.18",
         "ts-node": "^10.9.2",

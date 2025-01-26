@@ -9,7 +9,7 @@ async function main() {
     }
 
     // Deploy the contract
-    console.log(`Deploying PGVToken to ${network}...`);
+    console.info(`Deploying PGVToken to ${network}...`);
     await deployAndVerify("PGVToken", [], network, "tokenContract");
 }
 

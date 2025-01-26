@@ -1,6 +1,7 @@
 import { CHAINS_INFO } from "../../constants/chains";
 import { deployAndVerify } from "./utils";
 import { contracts } from "../../constants/contracts";
+import chalk from "chalk";
 import "dotenv/config";
 
 async function main() {
@@ -8,16 +9,19 @@ async function main() {
     const pgvTokenAddress = contracts.bscTestnet.tokenContract;
 
     if (!pgvTokenAddress) {
-        throw new Error("PGVToken address not found in constants/contracts.ts");
+        console.error("PGVToken address not found in constants/contracts.ts");
+        process.exit(1);
     }
 
-    console.log("Deploying GovernanceBSC to BSC Testnet...");
+    console.log(chalk.yellow("Deploying GovernanceBSC to BSC Testnet..."));
     await deployAndVerify(
         "GovernanceBSC",
         [pgvTokenAddress],
         CHAINS_INFO.BSC_TESTNET.networkKey,
         "governanceContract"
     );
+
+    console.log(chalk.green("GovernanceBSC deployed and verified successfully!"));
 }
 
 main().catch((error) => {

@@ -33,7 +33,7 @@ function updateContractsFile(
 export const contracts: Contracts = ${JSON.stringify(updatedContracts, null, 4)};`;
 
     writeFileSync(CONTRACTS_PATH, newContent);
-    console.log(`Updated contracts.ts with ${network} ${contractType} address: ${address}`);
+    console.info(`Updated contracts.ts with ${network} ${contractType} address: ${address}`);
 }
 
 /**

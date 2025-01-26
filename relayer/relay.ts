@@ -2,6 +2,7 @@ import { ethers } from "ethers";
 import dotenv from "dotenv";
 import { CHAINS_INFO } from "../constants/chains";
 import { contracts } from "../constants/contracts";
+import chalk from "chalk";
 
 dotenv.config();
 
@@ -47,7 +48,9 @@ async function main() {
                 log.args[3],
             ] as [bigint, string, bigint, bigint];
 
-            console.log(`📢 New proposal #${id}: ${description}`);
+            console.log(
+                chalk.blue(`📢 New proposal #${chalk.bold(id)}: ${chalk.green(description)}`)
+            );
 
             const tx = await GovernanceARB.mirrorProposal(
                 id,
@@ -56,15 +59,15 @@ async function main() {
                 endTime.toString()
             );
 
-            console.log(`⏳ Relaying... TX hash: ${tx.hash}`);
+            console.info(`⏳ Relaying... TX hash: ${chalk.underline(tx.hash)}`);
             await tx.wait();
-            console.log(`✅ Proposal ${id} relayed!`);
+            console.log(chalk.green(`✅ Proposal ${chalk.bold(id)} relayed!`));
         } catch (error) {
             console.error(`❌ Failed to relay proposal:`, error);
         }
     });
 
-    console.log("🚀 Relayer started. Listening for BSC proposals...");
+    console.log(chalk.green("🚀 Relayer started. Listening for BSC proposals..."));
 }
 
 main().catch((error) => {

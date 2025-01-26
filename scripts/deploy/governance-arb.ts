@@ -2,6 +2,7 @@ import { deployAndVerify } from "./utils";
 import { Wallet } from "ethers";
 import { CHAINS_INFO } from "../../constants/chains";
 import { contracts } from "../../constants/contracts";
+import chalk from "chalk";
 import "dotenv/config";
 
 async function main() {
@@ -9,27 +10,31 @@ async function main() {
     const relayerPrivateKey = process.env.RELAYER_PVT_KEY;
 
     if (!relayerPrivateKey) {
-        throw new Error("RELAYER_PVT_KEY not set in .env");
+        console.error("RELAYER_PVT_KEY not set in .env");
+        process.exit(1);
     }
 
     const relayerWallet = new Wallet(relayerPrivateKey);
     const relayerAddress = relayerWallet.address;
-    console.log(`Derived relayer address: ${relayerAddress}`);
+    console.log(chalk.blue(`Derived relayer address: ${chalk.green(relayerAddress)}`));
 
     // Get the PGVToken address from constants/contracts.ts
     const pgvTokenAddress = contracts.arbitrumTestnet.tokenContract;
 
     if (!pgvTokenAddress) {
-        throw new Error("PGVToken address not found in constants/contracts.ts");
+        console.error("PGVToken address not found in constants/contracts.ts");
+        process.exit(1);
     }
 
-    console.log("Deploying GovernanceARB to Arbitrum Testnet...");
+    console.log(chalk.yellow("Deploying GovernanceARB to Arbitrum Testnet..."));
     await deployAndVerify(
         "GovernanceARB",
         [pgvTokenAddress, relayerAddress], // Pass both arguments to the constructor
         CHAINS_INFO.ARB_TESTNET.networkKey,
         "governanceContract"
     );
+
+    console.log(chalk.green("GovernanceARB deployed and verified successfully!"));
 }
 
 main().catch((error) => {
