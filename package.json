@@ -8,7 +8,12 @@
         "typechain": "bunx hardhat typechain",
         "deploy": "bunx hardhat run ./scripts/deploy.ts",
         "node": "bunx hardhat node",
-        "genWallets": "bunx hardhat run scripts/setups/generateWallets.ts"
+        "genWallets": "bunx hardhat run scripts/setups/generateWallets.ts",
+        "deploy:bsc": "bunx hardhat run scripts/deploy/deploy-bsc.ts --network bscTestnet",
+        "deploy:arb": "bunx hardhat run scripts/deploy/deploy-arb.ts --network arbitrumTestnet",
+        "deploy:all": "bun run deploy:bsc && npm run deploy:arb",
+        "verify-bsc": "bunx hardhat verify --network bscTestnet",
+        "verify-arb": "bunx hardhat verify --network arbitrumTestnet"
     },
     "keywords": [],
     "author": "",
@@ -16,6 +21,8 @@
     "description": "",
     "dependencies": {
         "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+        "@types/dotenv": "^6.1.1",
+        "dotenv": "^16.4.7",
         "hardhat": "^2.22.18",
         "ts-node": "^10.9.2",
         "typescript": "^5.7.3"
