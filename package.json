@@ -10,6 +10,7 @@
         "node": "bunx hardhat node",
         "genWallets": "bunx hardhat run scripts/setups/generateWallets.ts",
         "relay": "bunx ts-node --files relayer/relay.ts",
+        "deploy:token": "bunx hardhat run scripts/deploy/token.ts --network bscTestnet & npx hardhat run scripts/deploy/token.ts --network arbitrumTestnet & wait",
         "deploy:bsc": "bunx hardhat run scripts/deploy/deploy-bsc.ts --network bscTestnet",
         "deploy:arb": "bunx hardhat run scripts/deploy/deploy-arb.ts --network arbitrumTestnet"
     },
