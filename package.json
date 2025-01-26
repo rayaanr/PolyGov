@@ -9,8 +9,6 @@
         "deploy": "bunx hardhat run ./scripts/deploy.ts",
         "node": "bunx hardhat node",
         "genWallets": "bunx hardhat run scripts/setups/generateWallets.ts",
-
-
         "relay": "bunx ts-node --files relayer/relay.ts",
         "deploy:bsc": "bunx hardhat run scripts/deploy/deploy-bsc.ts --network bscTestnet",
         "deploy:arb": "bunx hardhat run scripts/deploy/deploy-arb.ts --network arbitrumTestnet"
@@ -21,6 +19,7 @@
     "description": "",
     "dependencies": {
         "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+        "@openzeppelin/contracts": "^5.2.0",
         "@types/dotenv": "^6.1.1",
         "dotenv": "^16.4.7",
         "hardhat": "^2.22.18",

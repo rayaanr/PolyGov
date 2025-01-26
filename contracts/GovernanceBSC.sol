@@ -1,15 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-contract GovernanceBSC {
-    address public owner;
-    uint256 public votingPeriod = 3 days;
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-    enum Vote {
-        NONE,
-        YES,
-        NO
-    }
+contract GovernanceBSC is Ownable, ReentrancyGuard {
+    IERC20 public pgvToken;
 
     struct Proposal {
         uint256 id;
@@ -32,13 +29,8 @@ contract GovernanceBSC {
         uint256 endTime
     );
 
-    modifier onlyOwner() {
-        require(msg.sender == owner, "Not owner");
-        _;
-    }
-
-    constructor() {
-        owner = msg.sender;
+    constructor(address _pgvToken) Ownable(msg.sender) {
+        pgvToken = IERC20(_pgvToken);
     }
 
     function createProposal(string memory _description) external onlyOwner {
@@ -49,7 +41,7 @@ contract GovernanceBSC {
             yesVotes: 0,
             noVotes: 0,
             startTime: block.timestamp,
-            endTime: block.timestamp + votingPeriod,
+            endTime: block.timestamp + 3 days,
             executed: false
         });
 
@@ -57,22 +49,26 @@ contract GovernanceBSC {
             proposalCount,
             _description,
             block.timestamp,
-            block.timestamp + votingPeriod
+            block.timestamp + 3 days
         );
     }
 
-    function vote(uint256 _id, Vote _vote) external {
+    function vote(uint256 _id, bool _support) external nonReentrant {
         Proposal storage proposal = proposals[_id];
         require(block.timestamp < proposal.endTime, "Voting ended");
         require(!hasVoted[_id][msg.sender], "Already voted");
 
-        if (_vote == Vote.YES) proposal.yesVotes++;
-        else if (_vote == Vote.NO) proposal.noVotes++;
+        // Check voter's PGV balance
+        uint256 balance = pgvToken.balanceOf(msg.sender);
+        require(balance > 0, "No PGV tokens to vote");
+
+        if (_support) proposal.yesVotes += balance;
+        else proposal.noVotes += balance;
 
         hasVoted[_id][msg.sender] = true;
     }
 
-    function executeProposal(uint256 _id) external {
+    function executeProposal(uint256 _id) external nonReentrant {
         Proposal storage proposal = proposals[_id];
         require(block.timestamp >= proposal.endTime, "Voting ongoing");
         require(!proposal.executed, "Already executed");
