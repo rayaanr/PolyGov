@@ -1,16 +1,18 @@
 import { ethers } from "ethers";
 import dotenv from "dotenv";
+import { CHAINS_INFO } from "../constants/chains";
+import { contracts } from "../constants/contracts";
 
 dotenv.config();
 
 const CONFIG = {
     BSC: {
-        RPC: process.env.BSC_RPC || "https://data-seed-prebsc-1-s1.binance.org:8545",
-        CONTRACT: "0x31397A82ecd7CF98365D417530FbeE74476A5106",
+        RPC: process.env.BSC_RPC || CHAINS_INFO.BSC_TESTNET.pubRpcUrl,
+        CONTRACT: contracts.bscTestnet.governanceContract,
     },
     ARB: {
-        RPC: process.env.ARB_RPC || "https://sepolia-rollup.arbitrum.io/rpc",
-        CONTRACT: "0x662C260c8Bd205A0427C4B18a3F30fA27c775210",
+        RPC: process.env.ARB_RPC || CHAINS_INFO.ARB_TESTNET.pubRpcUrl,
+        CONTRACT: contracts.arbitrumTestnet.governanceContract,
     },
 };
 

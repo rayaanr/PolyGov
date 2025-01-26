@@ -1,19 +1,20 @@
 import { HardhatUserConfig } from "hardhat/config";
 import "@nomicfoundation/hardhat-toolbox";
 import "dotenv/config";
+import { CHAINS_INFO } from "./constants/chains";
 
 const config: HardhatUserConfig = {
     solidity: "0.8.28",
     networks: {
         bscTestnet: {
-            url: "https://data-seed-prebsc-1-s1.binance.org:8545",
-            chainId: 97,
+            url: CHAINS_INFO.BSC_TESTNET.pubRpcUrl,
+            chainId: CHAINS_INFO.BSC_TESTNET.chainId,
             accounts: [process.env.OWNER_PVT_KEY!],
         },
         // Arbitrum Testnet
         arbitrumTestnet: {
-            url: "https://sepolia-rollup.arbitrum.io/rpc",
-            chainId: 421614,
+            url: CHAINS_INFO.ARB_TESTNET.pubRpcUrl,
+            chainId: CHAINS_INFO.ARB_TESTNET.chainId,
             accounts: [process.env.OWNER_PVT_KEY!],
         },
     },
@@ -24,11 +25,11 @@ const config: HardhatUserConfig = {
         },
         customChains: [
             {
-                network: "arbitrumTestnet",
-                chainId: 421614,
+                network: CHAINS_INFO.BSC_TESTNET.networkKey,
+                chainId: CHAINS_INFO.ARB_TESTNET.chainId,
                 urls: {
-                    apiURL: "https://api-sepolia.arbiscan.io/api",
-                    browserURL: "https://sepolia.arbiscan.io/",
+                    apiURL: CHAINS_INFO.ARB_TESTNET.apiURL,
+                    browserURL: CHAINS_INFO.ARB_TESTNET.blockExplorer,
                 },
             },
         ],
