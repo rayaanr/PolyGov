@@ -1,4 +1,4 @@
-import { ethers } from "hardhat";
+import { ethers } from "ethers";
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -6,54 +6,66 @@ dotenv.config();
 const CONFIG = {
     BSC: {
         RPC: process.env.BSC_RPC || "https://data-seed-prebsc-1-s1.binance.org:8545",
-        CONTRACT: process.env.BSC_CONTRACT!,
+        CONTRACT: "0x31397A82ecd7CF98365D417530FbeE74476A5106",
     },
     ARB: {
         RPC: process.env.ARB_RPC || "https://sepolia-rollup.arbitrum.io/rpc",
-        CONTRACT: process.env.ARB_CONTRACT!,
+        CONTRACT: "0x662C260c8Bd205A0427C4B18a3F30fA27c775210",
     },
 };
 
 async function main() {
-    // Setup providers and signer
     const bscProvider = new ethers.JsonRpcProvider(CONFIG.BSC.RPC);
     const arbProvider = new ethers.JsonRpcProvider(CONFIG.ARB.RPC);
     const signer = new ethers.Wallet(process.env.RELAYER_PVT_KEY!, arbProvider);
 
-    // Load contracts with any types
-    const GovernanceBSC: any = new ethers.Contract(
+    const GovernanceBSC = new ethers.Contract(
         CONFIG.BSC.CONTRACT,
-        ["event ProposalCreated(uint256 indexed id, string description)"],
+        [
+            "event ProposalCreated(uint256 indexed id, string description, uint256 startTime, uint256 endTime)",
+        ],
         bscProvider
     );
 
-    const GovernanceARB: any = new ethers.Contract(
+    const GovernanceARB = new ethers.Contract(
         CONFIG.ARB.CONTRACT,
-        ["function createProposal(uint256 _id, string _description)"],
+        [
+            "function mirrorProposal(uint256 _id, string _description, uint256 _startTime, uint256 _endTime)",
+        ],
         signer
     );
 
-    // Event listener with any types
-    GovernanceBSC.on("ProposalCreated", async (id: any, description: any) => {
+    // Fixed event listener
+    GovernanceBSC.on(GovernanceBSC.filters.ProposalCreated(), async (log: ethers.EventLog) => {
         try {
-            console.log(`New proposal: #${id} - ${description}`);
+            const [id, description, startTime, endTime] = [
+                log.args[0],
+                log.args[1],
+                log.args[2],
+                log.args[3],
+            ] as [bigint, string, bigint, bigint];
 
-            // Relay proposal
-            const tx = await GovernanceARB.createProposal(id, description);
-            console.log(`Relaying... TX hash: ${tx.hash}`);
+            console.log(`📢 New proposal #${id}: ${description}`);
 
+            const tx = await GovernanceARB.mirrorProposal(
+                id,
+                description,
+                startTime.toString(),
+                endTime.toString()
+            );
+
+            console.log(`⏳ Relaying... TX hash: ${tx.hash}`);
             await tx.wait();
-            console.log(`Proposal ${id} relayed successfully!`);
+            console.log(`✅ Proposal ${id} relayed!`);
         } catch (error) {
-            console.error(`Error relaying proposal ${id}:`, error);
+            console.error(`❌ Failed to relay proposal:`, error);
         }
     });
 
-    console.log("Relayer started. Listening for BSC proposals...");
+    console.log("🚀 Relayer started. Listening for BSC proposals...");
 }
 
-// Run the relayer
 main().catch((error) => {
-    console.error("Relayer crashed:", error);
+    console.error("💥 Relayer crashed:", error);
     process.exit(1);
 });

@@ -1,13 +1,27 @@
-import { ethers } from "hardhat";
+import { deployAndVerify } from "./deploy";
+import { Wallet } from "ethers";
+import "dotenv/config";
 
 async function main() {
-  const GovernanceARB = await ethers.getContractFactory("GovernanceARB");
-  const governanceARB = await GovernanceARB.deploy();
-  await governanceARB.waitForDeployment();
-  console.log("GovernanceARB deployed to:", await governanceARB.getAddress());
+    // Get private key from environment
+    const relayerPrivateKey = process.env.RELAYER_PVT_KEY;
+
+    if (!relayerPrivateKey) {
+        throw new Error("RELAYER_PVT_KEY not set in .env");
+    }
+
+    // Create wallet from private key
+    const relayerWallet = new Wallet(relayerPrivateKey);
+
+    // Get checksum address
+    const relayerAddress = relayerWallet.address;
+    console.log(`Derived relayer address: ${relayerAddress}`);
+
+    // Deploy contract with derived address
+    await deployAndVerify("GovernanceARB", [relayerAddress], "arbitrumTestnet");
 }
 
 main().catch((error) => {
-  console.error(error);
-  process.exitCode = 1;
+    console.error("Deployment failed:", error);
+    process.exit(1);
 });
