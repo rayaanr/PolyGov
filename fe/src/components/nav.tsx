@@ -1,5 +1,4 @@
-import { Button } from "@/components/ui/button";
-import { WalletIcon } from "lucide-react";
+import { ConnectButton } from "@rainbow-me/rainbowkit";
 
 export function Nav() {
     return (
@@ -8,10 +7,7 @@ export function Nav() {
                 <div className="text-xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
                     PolyGov
                 </div>
-                <Button variant="outline" className="gap-2">
-                    <WalletIcon className="h-4 w-4" />
-                    Connect Wallet
-                </Button>
+                <ConnectButton chainStatus={"icon"} showBalance={false} />
             </div>
         </nav>
     );
