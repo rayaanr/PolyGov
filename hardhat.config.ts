@@ -21,15 +21,15 @@ const config: HardhatUserConfig = {
     etherscan: {
         apiKey: {
             bscTestnet: process.env.BSCSCAN_API_KEY!,
-            arbitrumTestnet: process.env.ARBISCAN_API_KEY!,
+            arbitrumTestnet: process.env.ARBITRUMSCAN_API_KEY!,
         },
         customChains: [
             {
-                network: CHAINS_INFO.BSC_TESTNET.networkKey,
-                chainId: CHAINS_INFO.ARB_TESTNET.chainId,
+                network: "arbitrumTestnet",
+                chainId: 421614,
                 urls: {
-                    apiURL: CHAINS_INFO.ARB_TESTNET.apiURL,
-                    browserURL: CHAINS_INFO.ARB_TESTNET.blockExplorer,
+                    apiURL: "https://api-sepolia.arbiscan.io/api",
+                    browserURL: "https://sepolia.arbiscan.io/",
                 },
             },
         ],
