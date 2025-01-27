@@ -4,6 +4,7 @@ import { GeistSans } from "geist/font/sans";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import WalletProvider from "@/components/wallet-provider";
+import { Toaster } from "@/components/ui/sonner"
 
 export const metadata: Metadata = {
     title: "PolyGov",
@@ -22,6 +23,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                     <WalletProvider>
                         <Nav />
                         <main className="pt-16">{children}</main>
+                        <Toaster position="top-center" richColors/>
                     </WalletProvider>
                 </ThemeProvider>
             </body>
