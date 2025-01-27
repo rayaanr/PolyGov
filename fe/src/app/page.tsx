@@ -9,8 +9,8 @@ export default function Page() {
         <div className="min-h-screen bg-background">
             <Suspense fallback={<Skeleton className="h-[800px]" />}>
                 <Dashboard />
-                <ProposalsList/>
-                <CreateProposalForm/>
+                <ProposalsList />
+                <CreateProposalForm />
             </Suspense>
         </div>
     );

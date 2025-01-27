@@ -2,7 +2,7 @@
 
 import "@rainbow-me/rainbowkit/styles.css";
 import { getDefaultConfig, RainbowKitProvider, darkTheme } from "@rainbow-me/rainbowkit";
-import { http, WagmiProvider } from "wagmi";
+import { WagmiProvider } from "wagmi";
 import { bscTestnet, arbitrumSepolia } from "wagmi/chains";
 import { QueryClientProvider, QueryClient } from "@tanstack/react-query";
 import { ReactNode } from "react";
@@ -12,9 +12,6 @@ const config = getDefaultConfig({
     appName: "PolyGov",
     projectId: "7429870ae71a8225e0328336ef1007e6",
     chains: [bscTestnet, arbitrumSepolia],
-    transports: {
-        [bscTestnet.id]: http("https://data-seed-prebsc-1-s1.binance.org:8545"),
-    },
     ssr: true,
 });
 
