@@ -25,6 +25,8 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { PlusIcon } from "lucide-react";
+import { useCreateProposal } from "@/hooks/useCreateProposal";
+import { toast } from "sonner";
 
 const formSchema = z.object({
     title: z.string().min(5, "Title must be at least 5 characters"),
@@ -40,6 +42,7 @@ const formSchema = z.object({
 
 export function CreateProposalDialog() {
     const [open, setOpen] = useState(false);
+    const { createProposal, isPending } = useCreateProposal();
 
     const form = useForm<z.infer<typeof formSchema>>({
         resolver: zodResolver(formSchema),
@@ -50,10 +53,23 @@ export function CreateProposalDialog() {
         },
     });
 
-    function onSubmit(values: z.infer<typeof formSchema>) {
-        console.log(values);
-        setOpen(false);
-        form.reset();
+    async function onSubmit(values: z.infer<typeof formSchema>) {
+        try {
+            // Calculate duration in days
+            const durationDays = Math.ceil(
+                (values.endDate.getTime() - Date.now()) / (24 * 60 * 60 * 1000)
+            );
+
+            // Call the createProposal function
+            await createProposal(values.title, values.description, durationDays.toString());
+
+            // Close the dialog and reset the form
+            setOpen(false);
+            form.reset();
+        } catch (err) {
+            // Errors are already handled in the hook, so no need to display them here
+            console.error("Failed to create proposal:", err);
+        }
     }
 
     return (
@@ -169,8 +185,8 @@ export function CreateProposalDialog() {
                                 </FormItem>
                             )}
                         />
-                        <Button type="submit" className="w-full">
-                            Create Proposal
+                        <Button type="submit" className="w-full" disabled={isPending}>
+                            {isPending ? "Creating Proposal..." : "Create Proposal"}
                         </Button>
                     </form>
                 </Form>

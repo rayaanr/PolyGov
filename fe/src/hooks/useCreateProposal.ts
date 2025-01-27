@@ -8,7 +8,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 export function useCreateProposal() {
-    const { writeContract, isPending, error, reset } = useWriteContract();
+    const { writeContractAsync, isPending, error, reset } = useWriteContract();
     const [isSuccess, setIsSuccess] = useState(false);
 
     const createProposal = async (title: string, description: string, durationDays: string) => {
@@ -17,7 +17,8 @@ export function useCreateProposal() {
         }
 
         try {
-            writeContract({
+            // Use writeContractAsync to properly await the transaction
+            await writeContractAsync({
                 address: CONTRACTS.bscTestnet.governanceContract,
                 abi: GovernanceBSCABI,
                 functionName: "createProposal",

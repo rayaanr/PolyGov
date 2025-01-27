@@ -2,7 +2,6 @@ import { Suspense } from "react";
 import Dashboard from "@/components/dashboard";
 import { Skeleton } from "@/components/ui/skeleton";
 import ProposalsList from "@/components/test";
-import CreateProposalForm from "@/components/CreateProposalForm";
 
 export default function Page() {
     return (
@@ -10,7 +9,6 @@ export default function Page() {
             <Suspense fallback={<Skeleton className="h-[800px]" />}>
                 <Dashboard />
                 <ProposalsList />
-                <CreateProposalForm />
             </Suspense>
         </div>
     );
