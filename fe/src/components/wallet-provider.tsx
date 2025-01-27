@@ -1,11 +1,12 @@
 "use client";
 
 import "@rainbow-me/rainbowkit/styles.css";
-import { getDefaultConfig, RainbowKitProvider } from "@rainbow-me/rainbowkit";
+import { getDefaultConfig, RainbowKitProvider, darkTheme } from "@rainbow-me/rainbowkit";
 import { WagmiProvider } from "wagmi";
 import { bscTestnet, arbitrumSepolia } from "wagmi/chains";
 import { QueryClientProvider, QueryClient } from "@tanstack/react-query";
 import { ReactNode } from "react";
+import { useTheme } from "next-themes";
 
 const config = getDefaultConfig({
     appName: "PolyGov",
@@ -16,11 +17,16 @@ const config = getDefaultConfig({
 
 const queryClient = new QueryClient();
 
-export default function Providers({ children }: { children: ReactNode }) {
+export default function WalletProvider({ children }: { children: ReactNode }) {
+    const { theme } = useTheme();
     return (
         <WagmiProvider config={config}>
             <QueryClientProvider client={queryClient}>
-                <RainbowKitProvider modalSize="compact" showRecentTransactions={true}>
+                <RainbowKitProvider
+                    modalSize="compact"
+                    showRecentTransactions={true}
+                    theme={theme === "dark" ? darkTheme() : undefined}
+                >
                     {children}
                 </RainbowKitProvider>
             </QueryClientProvider>
