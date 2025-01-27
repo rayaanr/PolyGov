@@ -24,16 +24,18 @@ import { Textarea } from "@/components/ui/textarea";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { CalendarIcon, PlusIcon } from "lucide-react";
-import { format } from "date-fns";
-import { cn } from "@/lib/utils";
-import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { PlusIcon } from "lucide-react";
 
 const formSchema = z.object({
     title: z.string().min(5, "Title must be at least 5 characters"),
     description: z.string().min(20, "Description must be at least 20 characters"),
-    endDate: z.date().min(new Date(), "End date must be in the future"),
+    endDate: z
+        .date()
+        .min(new Date(), "End date must be in the future")
+        .refine((date) => {
+            const days = (date.getTime() - Date.now()) / (1000 * 60 * 60 * 24);
+            return days <= 30;
+        }, "Voting duration cannot exceed 30 days"),
 });
 
 export function CreateProposalDialog() {
@@ -112,39 +114,56 @@ export function CreateProposalDialog() {
                             control={form.control}
                             name="endDate"
                             render={({ field }) => (
-                                <FormItem className="flex flex-col">
-                                    <FormLabel>End Date</FormLabel>
-                                    <Popover>
-                                        <PopoverTrigger asChild>
-                                            <FormControl>
-                                                <Button
-                                                    variant={"outline"}
-                                                    className={cn(
-                                                        "w-full pl-3 text-left font-normal",
-                                                        !field.value && "text-muted-foreground"
-                                                    )}
-                                                >
-                                                    {field.value ? (
-                                                        format(field.value, "PPP")
-                                                    ) : (
-                                                        <span>Pick a date</span>
-                                                    )}
-                                                    <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                                                </Button>
-                                            </FormControl>
-                                        </PopoverTrigger>
-                                        <PopoverContent className="w-auto p-0" align="start">
-                                            <Calendar
-                                                mode="single"
-                                                selected={field.value}
-                                                onSelect={field.onChange}
-                                                disabled={(date) => date < new Date()}
-                                                initialFocus
-                                            />
-                                        </PopoverContent>
-                                    </Popover>
+                                <FormItem className="space-y-4">
+                                    <FormLabel>Voting Duration (Days)</FormLabel>
+                                    <FormControl>
+                                        <Input
+                                            type="number"
+                                            min={1}
+                                            max={30}
+                                            {...field}
+                                            onChange={(e) => {
+                                                const days = Math.min(
+                                                    30,
+                                                    Math.max(
+                                                        1,
+                                                        Number.parseInt(e.target.value) || 1
+                                                    )
+                                                );
+                                                field.onChange(
+                                                    new Date(
+                                                        Date.now() + days * 24 * 60 * 60 * 1000
+                                                    )
+                                                );
+                                            }}
+                                            value={Math.ceil(
+                                                (field.value.getTime() - Date.now()) /
+                                                    (24 * 60 * 60 * 1000)
+                                            )}
+                                        />
+                                    </FormControl>
+                                    <div className="flex gap-2">
+                                        {[3, 5, 7, 10].map((days) => (
+                                            <Button
+                                                key={days}
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() =>
+                                                    field.onChange(
+                                                        new Date(
+                                                            Date.now() + days * 24 * 60 * 60 * 1000
+                                                        )
+                                                    )
+                                                }
+                                            >
+                                                {days}d
+                                            </Button>
+                                        ))}
+                                    </div>
                                     <FormDescription>
-                                        The date when the proposal voting will end
+                                        Select the number of days the proposal will be open for
+                                        voting (max 30 days)
                                     </FormDescription>
                                     <FormMessage />
                                 </FormItem>

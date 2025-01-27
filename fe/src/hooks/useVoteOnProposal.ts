@@ -7,29 +7,29 @@ import { bscTestnet } from "wagmi/chains";
 import { useState } from "react";
 import { toast } from "sonner";
 
-export function useCreateProposal() {
+export function useVoteOnProposal() {
     const { writeContract, isPending, error, reset } = useWriteContract();
     const [isSuccess, setIsSuccess] = useState(false);
 
-    const createProposal = async (title: string, description: string, durationDays: string) => {
-        if (!title || !description || !durationDays) {
-            throw new Error("Please fill in all fields.");
+    const voteOnProposal = async (proposalId: string, support: boolean) => {
+        if (!proposalId) {
+            throw new Error("Proposal ID is required.");
         }
 
         try {
             writeContract({
                 address: CONTRACTS.bscTestnet.governanceContract,
                 abi: GovernanceBSCABI,
-                functionName: "createProposal",
-                args: [title, description, BigInt(durationDays)],
+                functionName: "vote",
+                args: [BigInt(proposalId), support],
                 chainId: bscTestnet.id,
             });
 
             setIsSuccess(true);
             reset(); // Reset the hook state after a successful transaction
-            toast.success("Proposal created successfully!");
+            toast.success("Vote submitted successfully!");
         } catch (err) {
-            toast.error("Failed to create proposal.", {
+            toast.error("Failed to vote on proposal.", {
                 description: err instanceof Error ? err.message : "Unknown error occurred",
             });
             throw err; // Re-throw the error for the caller to handle
@@ -37,7 +37,7 @@ export function useCreateProposal() {
     };
 
     return {
-        createProposal,
+        voteOnProposal,
         isPending,
         isSuccess,
         error,
