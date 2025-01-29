@@ -5,8 +5,8 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract Governance is ReentrancyGuard {
-    IERC20 public pgvToken; // Governance token on each chain
-    address public relayer; // Trusted relayer address
+    IERC20 public pgvToken;
+    address public relayer;
 
     enum ProposalStatus {
         Pending,
@@ -23,19 +23,24 @@ contract Governance is ReentrancyGuard {
         uint256 startTime;
         uint256 endTime;
         ProposalStatus status;
+        uint256 finalYesVotes;
+        uint256 finalNoVotes;
+        bool voteTallyFinalized;
     }
 
     mapping(uint256 => Proposal) public proposals;
     mapping(uint256 => mapping(address => bool)) public hasVoted;
     uint256 public proposalCount;
 
-    // Custom errors
     error OnlyRelayer();
     error ProposalAlreadyExists();
     error VotingPeriodEnded();
+    error VotingPeriodNotEnded();
     error AlreadyVoted();
     error NoVotingPower();
     error ExecutionFailed();
+    error VoteNotFinalized();
+    error VoteAlreadyFinalized();
 
     event ProposalCreated(
         uint256 indexed id,
@@ -53,25 +58,35 @@ contract Governance is ReentrancyGuard {
         uint256 endTime
     );
 
+    event VoteTallyFinalized(
+        uint256 indexed id,
+        uint256 totalYesVotes,
+        uint256 totalNoVotes
+    );
+
     event ProposalExecuted(uint256 indexed id, ProposalStatus status);
+
+    event Voted(
+        uint256 indexed proposalId,
+        address indexed voter,
+        bool support,
+        uint256 weight
+    );
 
     constructor(address _pgvToken, address _relayer) {
         pgvToken = IERC20(_pgvToken);
         relayer = _relayer;
     }
 
-    /**
-     * @dev Create a proposal (Can be called by any user)
-     */
     function createProposal(
         string memory _title,
         string memory _description,
         uint256 _durationDays
     ) external nonReentrant {
         require(_durationDays >= 1, "Duration too short");
-
+        
         uint256 currentBalance = pgvToken.balanceOf(msg.sender);
-        if (currentBalance < 100 * 10 ** 18) {
+        if (currentBalance < 100 * 10**18) {
             revert NoVotingPower();
         }
 
@@ -85,7 +100,10 @@ contract Governance is ReentrancyGuard {
             noVotes: 0,
             startTime: block.timestamp,
             endTime: block.timestamp + (_durationDays * 1 days),
-            status: ProposalStatus.Pending
+            status: ProposalStatus.Pending,
+            finalYesVotes: 0,
+            finalNoVotes: 0,
+            voteTallyFinalized: false
         });
 
         emit ProposalCreated(
@@ -97,9 +115,6 @@ contract Governance is ReentrancyGuard {
         );
     }
 
-    /**
-     * @dev Mirror proposal from another chain (Only relayer can call)
-     */
     function mirrorProposal(
         uint256 _id,
         string memory _title,
@@ -118,15 +133,15 @@ contract Governance is ReentrancyGuard {
             noVotes: 0,
             startTime: _startTime,
             endTime: _endTime,
-            status: ProposalStatus.Pending
+            status: ProposalStatus.Pending,
+            finalYesVotes: 0,
+            finalNoVotes: 0,
+            voteTallyFinalized: false
         });
 
         emit ProposalMirrored(_id, _title, _description, _startTime, _endTime);
     }
 
-    /**
-     * @dev Vote using current token balance
-     */
     function vote(uint256 _id, bool _support) external nonReentrant {
         Proposal storage proposal = proposals[_id];
 
@@ -143,27 +158,43 @@ contract Governance is ReentrancyGuard {
         }
 
         hasVoted[_id][msg.sender] = true;
+        
+        emit Voted(_id, msg.sender, _support, votingPower);
     }
 
-    /**
-     * @dev Execute proposal after voting ends
-     */
+    function finalizeVoteTally(
+        uint256 _id,
+        uint256 _totalYesVotes,
+        uint256 _totalNoVotes
+    ) external {
+        if (msg.sender != relayer) revert OnlyRelayer();
+        
+        Proposal storage proposal = proposals[_id];
+        
+        if (block.timestamp < proposal.endTime) revert VotingPeriodNotEnded();
+        if (proposal.voteTallyFinalized) revert VoteAlreadyFinalized();
+        
+        proposal.finalYesVotes = _totalYesVotes;
+        proposal.finalNoVotes = _totalNoVotes;
+        proposal.voteTallyFinalized = true;
+
+        emit VoteTallyFinalized(_id, _totalYesVotes, _totalNoVotes);
+    }
+
     function executeProposal(uint256 _id) external nonReentrant {
         Proposal storage proposal = proposals[_id];
 
-        if (block.timestamp < proposal.endTime) revert VotingPeriodEnded();
+        if (block.timestamp < proposal.endTime) revert VotingPeriodNotEnded();
+        if (!proposal.voteTallyFinalized) revert VoteNotFinalized();
         if (proposal.status != ProposalStatus.Pending) revert ExecutionFailed();
 
-        proposal.status = (proposal.yesVotes > proposal.noVotes)
+        proposal.status = (proposal.finalYesVotes > proposal.finalNoVotes)
             ? ProposalStatus.Accepted
             : ProposalStatus.Rejected;
 
         emit ProposalExecuted(_id, proposal.status);
     }
 
-    /**
-     * @dev Check voting power (current balance)
-     */
     function getVotingPower(address _voter) external view returns (uint256) {
         return pgvToken.balanceOf(_voter);
     }
