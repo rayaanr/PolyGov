@@ -7,11 +7,11 @@ export interface Contracts {
 
 export const contracts: Contracts = {
     "arbitrumTestnet": {
-        "tokenContract": "0x16EF30625FA996166B306b87513815A2E25AE0B6",
-        "governanceContract": "0x417EE8c83Ba560255324A3A44e7F649102c30B0E"
+        "tokenContract": "0x476a56918Ef44c260609C5590e0699e1bBcaf621",
+        "governanceContract": "0xb4f328DD04a5999A8d3b5e50f694EBdCb8a31145"
     },
     "bscTestnet": {
-        "tokenContract": "0x03132bE762736c777F53Db0E863B41Ef9c285e70",
-        "governanceContract": "0x476a56918Ef44c260609C5590e0699e1bBcaf621"
+        "tokenContract": "0x67519e6D910e28E857fd211FC50f6229e35DB887",
+        "governanceContract": "0xaA3F68398c001f70f5b2df8D1B352C86C097A688"
     }
 };

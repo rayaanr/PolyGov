@@ -7,21 +7,21 @@ const config: HardhatUserConfig = {
     solidity: "0.8.28",
     networks: {
         bscTestnet: {
-            url: CHAINS_INFO.BSC_TESTNET.pubRpcUrl,
-            chainId: CHAINS_INFO.BSC_TESTNET.chainId,
+            url: "https://data-seed-prebsc-1-s1.binance.org:8545",
+            chainId: 97,
             accounts: [process.env.OWNER_PVT_KEY!],
         },
         // Arbitrum Testnet
         arbitrumTestnet: {
-            url: CHAINS_INFO.ARB_TESTNET.pubRpcUrl,
-            chainId: CHAINS_INFO.ARB_TESTNET.chainId,
+            url: "https://sepolia-rollup.arbitrum.io/rpc",
+            chainId: 421614,
             accounts: [process.env.OWNER_PVT_KEY!],
         },
     },
     etherscan: {
         apiKey: {
             bscTestnet: process.env.BSCSCAN_API_KEY!,
-            arbitrumTestnet: process.env.ARBITRUMSCAN_API_KEY!,
+            arbitrumTestnet: "I2GDHYCNDURPR4U8JFYG3DN747QKUVXKM8",
         },
         customChains: [
             {
