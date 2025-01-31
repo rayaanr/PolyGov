@@ -1,309 +1,366 @@
 import { ethers } from "ethers";
 import dotenv from "dotenv";
-import { CHAINS_INFO } from "../constants/chains";
-import { contracts } from "../constants/contracts";
 import chalk from "chalk";
-import fs from "fs";
 import path from "path";
+import fs from "fs";
+import { contracts } from "../constants/contracts";
 
 dotenv.config();
 
+type networks = "BSC" | "ARB";
+
+/** ----------------------
+ *  1. Configuration
+ * --------------------- */
 const CONFIG = {
     BSC: {
-        RPC: process.env.BSC_RPC || CHAINS_INFO.BSC_TESTNET.pubRpcUrl,
+        WS_URL: process.env.BSC_WS_URL || "",
         CONTRACT: contracts.bscTestnet.governanceContract,
+        // JSON file tracking last processed block (optional if needed)
         LAST_BLOCK_FILE: path.join(__dirname, "last_bsc_block.json"),
     },
     ARB: {
-        RPC: process.env.ARB_RPC || CHAINS_INFO.ARB_TESTNET.pubRpcUrl,
+        WS_URL: process.env.ARB_WS_URL || "",
         CONTRACT: contracts.arbitrumTestnet.governanceContract,
+        // JSON file tracking last processed block (optional if needed)
         LAST_BLOCK_FILE: path.join(__dirname, "last_arb_block.json"),
     },
 };
 
-// Governance ABI
+// The Governance contract ABI
 const GOVERNANCE_ABI = [
-    "function proposalCount() view returns (uint256)",
-    "function proposals(uint256) view returns (uint256, string, string, uint256, uint256, uint256, uint256, uint8, uint256, uint256, bool)",
-    "function mirrorProposal(uint256, string, string, uint256, uint256)",
-    "function finalizeVoteTally(uint256, uint256, uint256)",
-    "function executeProposal(uint256)",
-    "event ProposalCreated(uint256 indexed, string, string, uint256, uint256)",
-    "event VoteTallyFinalized(uint256 indexed, uint256, uint256)",
-    "event ProposalExecuted(uint256 indexed, uint8)",
+    "function proposals(bytes32) view returns (bytes32, string, string, uint256, uint256, uint256, uint256, uint8, uint256, uint256, bool)",
+    "function mirrorProposal(bytes32, string, string, uint256, uint256)",
+    "function finalizeVoteTally(bytes32, uint256, uint256)",
+    "function executeProposal(bytes32)",
+    "event ProposalCreated(bytes32 indexed, string, string, uint256, uint256)",
+    "function getAllProposalIds() view returns (bytes32[])"
 ];
 
-interface ContractInstances {
-    bscProvider: ethers.JsonRpcProvider;
-    arbProvider: ethers.JsonRpcProvider;
-    bscSigner: ethers.Wallet;
-    arbSigner: ethers.Wallet;
-    GovernanceBSC: ethers.Contract;
-    GovernanceARB: ethers.Contract;
-    BscContractSigner: ethers.Contract;
-    ArbContractSigner: ethers.Contract;
+/** -------------------------------------------------
+ *  2. Optional: Last Block Tracking (File I/O)
+ * ------------------------------------------------ */
+// If you want to avoid re-reading old blocks, you can store the last processed block in a file
+async function readLastBlock(network: networks, provider: ethers.Provider): Promise<number> {
+    try {
+        // Check if the file exists and is non-empty
+        if (!fs.existsSync(CONFIG[network].LAST_BLOCK_FILE) || fs.statSync(CONFIG[network].LAST_BLOCK_FILE).size === 0) {
+            console.warn(`⚠️ Block file for ${network} is missing or empty.`);
+
+            // Get the current block number and return (currentBlock - 1000)
+            const currentBlock = await provider.getBlockNumber();
+            const safeStartBlock = Math.max(currentBlock - 1000, 0);
+            console.warn(`⏩ Defaulting to block ${safeStartBlock} (currentBlock - 1000).`);
+            return safeStartBlock;
+        }
+
+        const data = JSON.parse(fs.readFileSync(CONFIG[network].LAST_BLOCK_FILE, "utf8"));
+        return data.block ?? 0;
+    } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        console.warn(`⚠️ Could not read or parse block file for ${network}: ${errorMessage}`);
+
+        // On error, return currentBlock - 1000
+        const currentBlock = await provider.getBlockNumber();
+        const safeStartBlock = Math.max(currentBlock - 1000, 0);
+        console.warn(`⏩ Defaulting to block ${safeStartBlock} due to read error.`);
+        return safeStartBlock;
+    }
 }
 
-// Block tracking utilities
-const readLastBlock = (chain: "BSC" | "ARB"): number => {
-    try {
-        return JSON.parse(fs.readFileSync(CONFIG[chain].LAST_BLOCK_FILE, "utf-8")).block;
-    } catch {
-        return 0;
-    }
-};
 
-const writeLastBlock = (chain: "BSC" | "ARB", block: number) => {
-    fs.writeFileSync(CONFIG[chain].LAST_BLOCK_FILE, JSON.stringify({ block }));
-};
+function writeLastBlock(network: networks, block: number) {
+    fs.writeFileSync(CONFIG[network].LAST_BLOCK_FILE, JSON.stringify({ block }), "utf8");
+}
 
-async function initializeContracts(): Promise<ContractInstances> {
-    const bscProvider = new ethers.JsonRpcProvider(CONFIG.BSC.RPC);
-    const arbProvider = new ethers.JsonRpcProvider(CONFIG.ARB.RPC);
+/** -------------------------------------------------
+ *  3. Reconnecting WebSocket Providers
+ * ------------------------------------------------ */
+function createReconnectingProvider(wsUrl: string): ethers.WebSocketProvider {
+    // Create WebSocket with custom reconnect logic
+    let ws = createWebSocket(wsUrl);
 
-    const signer = new ethers.Wallet(process.env.RELAYER_PVT_KEY!);
+    ws.onclose = (event) => {
+        console.warn(
+            `⚠️ WebSocket closed (code: ${event.code}, reason: ${event.reason}). Reconnecting...`
+        );
+        setTimeout(() => {
+            ws = createWebSocket(wsUrl);
+        }, 5000);
+    };
+
+    ws.onerror = (error) => {
+        console.error("WebSocket error:", error);
+    };
+
+    // Use ethers.js provider with the custom WebSocket
+    return new ethers.WebSocketProvider(ws);
+}
+
+function createWebSocket(wsUrl: string): WebSocket {
+    return new WebSocket(wsUrl);
+}
+
+/** -------------------------------------------------
+ *  4. Initialization of Contracts
+ * ------------------------------------------------ */
+async function initializeContracts() {
+    const bscProvider = createReconnectingProvider(CONFIG.BSC.WS_URL);
+    const arbProvider = createReconnectingProvider(CONFIG.ARB.WS_URL);
+
+    // The same private key can sign transactions on both providers
+    const signer = new ethers.Wallet(process.env.RELAYER_PVT_KEY || "");
+
+    // Connect the signer to each chain's provider
     const bscSigner = signer.connect(bscProvider);
     const arbSigner = signer.connect(arbProvider);
 
-    const GovernanceBSC = new ethers.Contract(CONFIG.BSC.CONTRACT, GOVERNANCE_ABI, bscProvider);
-    const GovernanceARB = new ethers.Contract(CONFIG.ARB.CONTRACT, GOVERNANCE_ABI, arbProvider);
+    // Create the contract instances with the connected signers
+    const bscContract = new ethers.Contract(CONFIG.BSC.CONTRACT, GOVERNANCE_ABI, bscSigner);
 
-    const BscContractSigner = GovernanceBSC.connect(bscSigner) as ethers.Contract;
-    const ArbContractSigner = GovernanceARB.connect(arbSigner) as ethers.Contract;
+    const arbContract = new ethers.Contract(CONFIG.ARB.CONTRACT, GOVERNANCE_ABI, arbSigner);
 
     return {
         bscProvider,
         arbProvider,
-        bscSigner,
-        arbSigner,
-        GovernanceBSC,
-        GovernanceARB,
-        BscContractSigner,
-        ArbContractSigner,
+        bscContract,
+        arbContract,
     };
 }
 
-async function relayProposal(
-    proposalId: bigint,
-    title: string,
-    description: string,
-    sourceEndTime: bigint,
+/** -------------------------------------------------
+ *  5. Utility: Get a proposal from a contract
+ * ------------------------------------------------ */
+interface RawProposal {
+    // The shape matches the `proposals(uint256)` return from the ABI
+    0: bigint; // id
+    1: string; // title
+    2: string; // description
+    3: bigint; // yesVotes
+    4: bigint; // noVotes
+    5: bigint; // startTime
+    6: bigint; // endTime
+    7: number; // status
+    8: bigint; // finalYesVotes
+    9: bigint; // finalNoVotes
+    10: boolean; // voteTallyFinalized
+}
+
+async function getProposal(contract: ethers.Contract, proposalId: string): Promise<RawProposal> {
+    const proposal = (await contract.proposals(proposalId)) as RawProposal;
+    return proposal;
+}
+
+async function getAllProposalIds(contract: ethers.Contract): Promise<string[]> {
+    try {
+        return await contract.getAllProposalIds();
+    } catch (error) {
+        console.error(`❌ Error fetching proposal IDs:`, error);
+        return [];
+    }
+}
+
+
+/** -------------------------------------------------
+ *  6. Syncing Proposals on Startup
+ * ------------------------------------------------ */
+async function syncProposals(
+    sourceContract: ethers.Contract,
     targetContract: ethers.Contract,
-    targetChain: "BSC" | "ARB"
+    targetChain: networks
+) {
+    console.log(`🔄 Starting proposal sync from source to ${targetChain}`);
+
+    // Fetch all proposal IDs from the source contract
+    const proposalIds = await getAllProposalIds(sourceContract);
+    console.log(`📄 Found ${proposalIds.length} proposals on source chain`);
+
+    for (const proposalId of proposalIds) {
+        try {
+            // Check if the proposal exists on the target chain
+            const targetProposal = await targetContract.proposals(proposalId);
+
+            // If the proposal doesn't exist (startTime = 0), relay it
+            if (targetProposal[5] === 0n) {
+                console.log(chalk.yellow(`🚀 Relaying missing proposal ${proposalId} to ${targetChain}`));
+                await relayProposal(sourceContract, targetContract, proposalId, targetChain);
+            } else {
+                console.log(chalk.green(`✅ Proposal ${proposalId} already synced on ${targetChain}`));
+            }
+        } catch (error) {
+            console.error(`❌ Error syncing proposal ${proposalId}:`, error);
+        }
+    }
+
+    console.log(`🏁 Sync complete for ${targetChain}`);
+}
+
+
+
+
+/** -------------------------------------------------
+ *  7. Relaying a Single Proposal
+ * ------------------------------------------------ */
+async function relayProposal(
+    sourceContract: ethers.Contract,
+    targetContract: ethers.Contract,
+    proposalId: string,
+    targetChain: networks
 ) {
     try {
-        const targetProvider = targetContract.runner?.provider;
-        if (!targetProvider) throw new Error("Missing provider");
+        const sourceProposal = await getProposal(sourceContract, proposalId);
+        const sourceDuration = sourceProposal[6] - sourceProposal[5];
 
-        // Get current block time on target chain
-        const currentBlock = await targetProvider.getBlock("latest");
-        if (!currentBlock) {
-            throw new Error("Failed to fetch current block");
-        }
-        const newEndTime =
-            BigInt(currentBlock.timestamp) + (sourceEndTime - BigInt(currentBlock.timestamp));
+        // Get the latest block timestamp on the target chain
+        const currentBlock = await targetContract.runner?.provider?.getBlock("latest");
+        if (!currentBlock) throw new Error("Failed to get target chain's latest block");
 
-        // Check if proposal already exists
-        const existingProposal = await targetContract.proposals(proposalId);
-        if (existingProposal.startTime !== 0n) {
-            console.log(chalk.yellow(`⚠️ Proposal ${proposalId} already exists on ${targetChain}`));
-            return;
-        }
+        const newStart = BigInt(currentBlock.timestamp);
+        const newEnd = newStart + sourceDuration;
 
-        // Mirror proposal with corrected timing
+        console.log(`🚀 Relaying proposal ${proposalId} to ${targetChain}`);
         const tx = await targetContract.mirrorProposal(
             proposalId,
-            title,
-            description,
-            currentBlock.timestamp,
-            newEndTime.toString()
+            sourceProposal[1],  // title
+            sourceProposal[2],  // description
+            newStart,
+            newEnd
         );
-
-        console.log(chalk.blue(`⏳ Relaying proposal ${proposalId} to ${targetChain}...`));
         await tx.wait();
-        console.log(
-            chalk.green(`✅ Proposal ${proposalId} successfully relayed to ${targetChain}`)
-        );
+
+        console.log(chalk.green(`✅ Proposal ${proposalId} relayed successfully to ${targetChain}`));
     } catch (error) {
-        console.error(
-            chalk.red(`❌ Error relaying proposal ${proposalId} to ${targetChain}:`),
-            error
-        );
+        console.error(`❌ Error relaying proposal ${proposalId}:`, error);
     }
 }
 
-async function syncProposals(contracts: ContractInstances) {
-    try {
-        const [bscCount, arbCount] = await Promise.all([
-            contracts.GovernanceBSC.proposalCount(),
-            contracts.GovernanceARB.proposalCount(),
-        ]);
 
-        console.log(chalk.blue(`🔄 Starting proposal sync: BSC(${bscCount}) ↔ ARB(${arbCount})`));
 
-        // Sync BSC -> ARB
-        if (bscCount > arbCount) {
-            for (let id = arbCount + 1n; id <= bscCount; id++) {
-                const proposal = await contracts.GovernanceBSC.proposals(id);
-                await relayProposal(
-                    id,
-                    proposal.title,
-                    proposal.description,
-                    BigInt(proposal.endTime),
-                    contracts.ArbContractSigner,
-                    "ARB"
-                );
-            }
+/** -------------------------------------------------
+ *  8. Listening for New Proposals (Event-based)
+ * ------------------------------------------------ */
+function listenForProposals(
+    sourceName: networks,
+    sourceContract: ethers.Contract,
+    targetName: networks,
+    targetContract: ethers.Contract
+) {
+    sourceContract.on("ProposalCreated", async (id: string, title, desc, start, end, event) => {
+        try {
+            // Proposal ID is now bytes32 (string in ethers.js)
+            console.log(chalk.blue(`📢 New proposal on ${sourceName}: ID ${id} - ${title}`));
+
+            // Relay it to the target chain
+            await relayProposal(sourceContract, targetContract, id, targetName);
+        } catch (error) {
+            console.error("❌ Error handling new proposal event:", error);
         }
-
-        // Sync ARB -> BSC
-        if (arbCount > bscCount) {
-            for (let id = bscCount + 1n; id <= arbCount; id++) {
-                const proposal = await contracts.GovernanceARB.proposals(id);
-                await relayProposal(
-                    id,
-                    proposal.title,
-                    proposal.description,
-                    BigInt(proposal.endTime),
-                    contracts.BscContractSigner,
-                    "BSC"
-                );
-            }
-        }
-
-        console.log(chalk.green(`✅ Proposal sync complete`));
-    } catch (error) {
-        console.error(chalk.red(`❌ Error syncing proposals:`), error);
-    }
+    });
 }
 
-async function processCompletedProposals(contracts: ContractInstances) {
-    try {
-        const proposalCount = await contracts.GovernanceBSC.proposalCount();
-        console.log(chalk.blue(`🔍 Checking ${proposalCount} proposals for completion`));
+/** -------------------------------------------------
+ *  9. Periodic Vote Finalization & Execution
+ * ------------------------------------------------ */
+async function processCompletedProposals(
+    bscContract: ethers.Contract,
+    arbContract: ethers.Contract
+) {
+    const currentTime = BigInt(Math.floor(Date.now() / 1000));
+    const proposalIds = await getAllProposalIds(bscContract); // Fetch proposal IDs
 
-        for (let id = 1n; id <= proposalCount; id++) {
-            const [bscProposal, arbProposal] = await Promise.all([
-                contracts.GovernanceBSC.proposals(id),
-                contracts.GovernanceARB.proposals(id),
+    for (const proposalId of proposalIds) {
+        try {
+            const [bscData, arbData] = await Promise.all([
+                getProposal(bscContract, proposalId),
+                getProposal(arbContract, proposalId),
             ]);
 
-            // Determine latest end time across chains
-            const endTimes = [];
-            if (bscProposal.startTime !== 0n) endTimes.push(BigInt(bscProposal.endTime));
-            if (arbProposal.startTime !== 0n) endTimes.push(BigInt(arbProposal.endTime));
-            const latestEndTime = endTimes.reduce((a, b) => (a > b ? a : b), 0n);
+            console.log(`Processing proposal ${proposalId}:`);
+            console.log(`- BSC Status: ${bscData[10] ? "Finalized" : "Pending"}`);
+            console.log(`- ARB Status: ${arbData[10] ? "Finalized" : "Pending"}`);
 
-            // Skip if voting period not ended or already finalized
-            if (latestEndTime === 0n || Date.now() / 1000 < Number(latestEndTime)) continue;
-            if (bscProposal.voteTallyFinalized && arbProposal.voteTallyFinalized) continue;
-
-            console.log(chalk.yellow(`📊 Processing votes for proposal ${id}`));
-
-            // Aggregate votes
-            const totalYes = BigInt(bscProposal.yesVotes) + BigInt(arbProposal.yesVotes);
-            const totalNo = BigInt(bscProposal.noVotes) + BigInt(arbProposal.noVotes);
-
-            // Finalize on both chains
-            if (!bscProposal.voteTallyFinalized) {
-                await contracts.BscContractSigner.finalizeVoteTally(id, totalYes, totalNo);
+            // Skip if voting period hasn't ended on either chain
+            if (currentTime < bscData[6]) {
+                console.log(`Voting period ongoing for ${proposalId} on BSC`);
+                continue;
             }
-            if (!arbProposal.voteTallyFinalized) {
-                await contracts.ArbContractSigner.finalizeVoteTally(id, totalYes, totalNo);
+            if (currentTime < arbData[6]) {
+                console.log(`Voting period ongoing for ${proposalId} on ARB`);
+                continue;
             }
 
-            // Execute proposals
-            if (bscProposal.status === 0) {
-                await contracts.BscContractSigner.executeProposal(id);
+            const totalYes = bscData[3] + arbData[3];
+            const totalNo = bscData[4] + arbData[4];
+
+            // Finalize votes if needed
+            if (!bscData[10]) {
+                const tx = await bscContract.finalizeVoteTally(proposalId, totalYes, totalNo);
+                await tx.wait();
+                console.log(chalk.green(`✅ Finalized votes for ${proposalId} on BSC`));
             }
-            if (arbProposal.status === 0) {
-                await contracts.ArbContractSigner.executeProposal(id);
+            if (!arbData[10]) {
+                const tx = await arbContract.finalizeVoteTally(proposalId, totalYes, totalNo);
+                await tx.wait();
+                console.log(chalk.green(`✅ Finalized votes for ${proposalId} on ARB`));
             }
 
-            console.log(chalk.green(`✅ Proposal ${id} processed`));
+            // Execute proposals if eligible and not already executed
+            if (bscData[10] && bscData[7] === 0) {
+                await maybeExecuteProposal(proposalId, bscContract, bscData);
+            }
+            if (arbData[10] && arbData[7] === 0) {
+                await maybeExecuteProposal(proposalId, arbContract, arbData);
+            }
+        } catch (error) {
+            console.error(`❌ Error processing proposal ${proposalId}:`, error);
         }
-    } catch (error) {
-        console.error(chalk.red(`❌ Error processing proposals:`), error);
     }
 }
 
-async function pollNewEvents(contracts: ContractInstances) {
-    try {
-        // Poll BSC events
-        const bscLastBlock = readLastBlock("BSC");
-        const bscLogs = await contracts.bscProvider.getLogs({
-            address: CONFIG.BSC.CONTRACT,
-            fromBlock: bscLastBlock + 1,
-            toBlock: "latest",
-            topics: [ethers.id("ProposalCreated(uint256,string,string,uint256,uint256)")],
-        });
-
-        for (const log of bscLogs) {
-            const decoded = contracts.GovernanceBSC.interface.decodeEventLog(
-                "ProposalCreated",
-                log.data,
-                log.topics
-            );
-
-            await relayProposal(
-                decoded.id,
-                decoded.title,
-                decoded.description,
-                decoded.endTime,
-                contracts.ArbContractSigner,
-                "ARB"
-            );
-            writeLastBlock("BSC", log.blockNumber);
-        }
-
-        // Poll ARB events
-        const arbLastBlock = readLastBlock("ARB");
-        const arbLogs = await contracts.arbProvider.getLogs({
-            address: CONFIG.ARB.CONTRACT,
-            fromBlock: arbLastBlock + 1,
-            toBlock: "latest",
-            topics: [ethers.id("ProposalCreated(uint256,string,string,uint256,uint256)")],
-        });
-
-        for (const log of arbLogs) {
-            const decoded = contracts.GovernanceARB.interface.decodeEventLog(
-                "ProposalCreated",
-                log.data,
-                log.topics
-            );
-
-            await relayProposal(
-                decoded.id,
-                decoded.title,
-                decoded.description,
-                decoded.endTime,
-                contracts.BscContractSigner,
-                "BSC"
-            );
-            writeLastBlock("ARB", log.blockNumber);
-        }
-    } catch (error) {
-        console.error(chalk.red(`❌ Error polling events:`), error);
+async function maybeExecuteProposal(
+    proposalId: string,
+    contract: ethers.Contract,
+    data: RawProposal
+) {
+    // status = 0 => Pending in your enum
+    // If finalYesVotes > finalNoVotes => status may become 1 => Accepted
+    // We only attempt to execute if status is 0 (Pending) to let the contract set the final status
+    if (data[7] === 0 && data[10] === true) {
+        const tx = await contract.executeProposal(proposalId);
+        await tx.wait();
+        console.log(chalk.green(`🚀 Executed proposal ${proposalId} on ${contract.address}`));
     }
 }
 
+/** -------------------------------------------------
+ *  10. Main Entrypoint
+ * ------------------------------------------------ */
 async function main() {
-    console.log(chalk.blue("🚀 Starting Governance Relayer"));
+    console.log(chalk.blue("🚀 Starting Governance Relayer (Ethers v6)"));
 
-    const contracts = await initializeContracts();
-    await syncProposals(contracts);
+    const { bscContract, arbContract } = await initializeContracts();
 
-    // Initial processing of any pending proposals
-    await processCompletedProposals(contracts);
+    // 1) Sync all proposals on startup
+    console.log(chalk.blue("🔄 Syncing proposals on startup..."));
+    await Promise.all([
+        syncProposals(bscContract, arbContract, "ARB"),
+        syncProposals(arbContract, bscContract, "BSC"),
+    ]);
 
-    // Set up regular intervals
-    setInterval(() => pollNewEvents(contracts), 15000); // 15 seconds
-    setInterval(() => processCompletedProposals(contracts), 60000); // 1 minute
+    // 2) Listen for new proposals on both chains
+    listenForProposals("BSC", bscContract, "ARB", arbContract);
+    listenForProposals("ARB", arbContract, "BSC", bscContract);
 
-    console.log(chalk.green("🏁 Relayer operational"));
+    // 3) Periodically process completed proposals
+    setInterval(() => processCompletedProposals(bscContract, arbContract), 60_000);
+
+    console.log(chalk.green("🏁 Relayer is operational!"));
 }
 
-main().catch((error) => {
-    console.error(chalk.red("💥 Fatal error:"), error);
+
+
+// Start the relayer
+main().catch((err) => {
+    console.error("💥 Fatal error in relayer:", err);
     process.exit(1);
 });

@@ -15,7 +15,7 @@ contract Governance is ReentrancyGuard {
     }
 
     struct Proposal {
-        uint256 id;
+        bytes32 id; // UUID for uniqueness
         string title;
         string description;
         uint256 yesVotes;
@@ -28,9 +28,9 @@ contract Governance is ReentrancyGuard {
         bool voteTallyFinalized;
     }
 
-    mapping(uint256 => Proposal) public proposals;
-    mapping(uint256 => mapping(address => bool)) public hasVoted;
-    uint256 public proposalCount;
+    mapping(bytes32 => Proposal) public proposals;
+    mapping(bytes32 => mapping(address => bool)) public hasVoted;
+    bytes32[] public proposalIds; // Store all proposal UUIDs for querying
 
     error OnlyRelayer();
     error ProposalAlreadyExists();
@@ -43,7 +43,7 @@ contract Governance is ReentrancyGuard {
     error VoteAlreadyFinalized();
 
     event ProposalCreated(
-        uint256 indexed id,
+        bytes32 indexed id,
         string title,
         string description,
         uint256 startTime,
@@ -51,7 +51,7 @@ contract Governance is ReentrancyGuard {
     );
 
     event ProposalMirrored(
-        uint256 indexed id,
+        bytes32 indexed id,
         string title,
         string description,
         uint256 startTime,
@@ -59,15 +59,15 @@ contract Governance is ReentrancyGuard {
     );
 
     event VoteTallyFinalized(
-        uint256 indexed id,
+        bytes32 indexed id,
         uint256 totalYesVotes,
         uint256 totalNoVotes
     );
 
-    event ProposalExecuted(uint256 indexed id, ProposalStatus status);
+    event ProposalExecuted(bytes32 indexed id, ProposalStatus status);
 
     event Voted(
-        uint256 indexed proposalId,
+        bytes32 indexed proposalId,
         address indexed voter,
         bool support,
         uint256 weight
@@ -78,22 +78,33 @@ contract Governance is ReentrancyGuard {
         relayer = _relayer;
     }
 
+    /** --------------------------------------
+     *  Create Proposal with Unique UUID
+     * -------------------------------------- */
     function createProposal(
         string memory _title,
         string memory _description,
         uint256 _durationDays
     ) external nonReentrant {
         require(_durationDays >= 1, "Duration too short");
-        
+
         uint256 currentBalance = pgvToken.balanceOf(msg.sender);
-        if (currentBalance < 100 * 10**18) {
+        if (currentBalance < 100 * 10 ** 18) {
             revert NoVotingPower();
         }
 
-        proposalCount++;
+        // Generate the unique proposal ID (UUID)
+        bytes32 proposalId = keccak256(
+            abi.encodePacked(
+                block.timestamp,
+                msg.sender,
+                proposalIds.length,
+                block.chainid
+            )
+        );
 
-        proposals[proposalCount] = Proposal({
-            id: proposalCount,
+        proposals[proposalId] = Proposal({
+            id: proposalId,
             title: _title,
             description: _description,
             yesVotes: 0,
@@ -106,8 +117,11 @@ contract Governance is ReentrancyGuard {
             voteTallyFinalized: false
         });
 
+        // Store the UUID in the array for easy querying
+        proposalIds.push(proposalId);
+
         emit ProposalCreated(
-            proposalCount,
+            proposalId,
             _title,
             _description,
             block.timestamp,
@@ -115,18 +129,22 @@ contract Governance is ReentrancyGuard {
         );
     }
 
+    /** ----------------------------------------
+     *  Mirror Proposal (for relayer only)
+     * ---------------------------------------- */
     function mirrorProposal(
-        uint256 _id,
+        bytes32 proposalId,
         string memory _title,
         string memory _description,
         uint256 _startTime,
         uint256 _endTime
     ) external nonReentrant {
         if (msg.sender != relayer) revert OnlyRelayer();
-        if (proposals[_id].startTime != 0) revert ProposalAlreadyExists();
+        if (proposals[proposalId].startTime != 0)
+            revert ProposalAlreadyExists();
 
-        proposals[_id] = Proposal({
-            id: _id,
+        proposals[proposalId] = Proposal({
+            id: proposalId,
             title: _title,
             description: _description,
             yesVotes: 0,
@@ -139,14 +157,25 @@ contract Governance is ReentrancyGuard {
             voteTallyFinalized: false
         });
 
-        emit ProposalMirrored(_id, _title, _description, _startTime, _endTime);
+        proposalIds.push(proposalId);
+
+        emit ProposalMirrored(
+            proposalId,
+            _title,
+            _description,
+            _startTime,
+            _endTime
+        );
     }
 
-    function vote(uint256 _id, bool _support) external nonReentrant {
-        Proposal storage proposal = proposals[_id];
+    /** ----------------------------------------
+     *  Voting Logic
+     * ---------------------------------------- */
+    function vote(bytes32 proposalId, bool _support) external nonReentrant {
+        Proposal storage proposal = proposals[proposalId];
 
         if (block.timestamp >= proposal.endTime) revert VotingPeriodEnded();
-        if (hasVoted[_id][msg.sender]) revert AlreadyVoted();
+        if (hasVoted[proposalId][msg.sender]) revert AlreadyVoted();
 
         uint256 votingPower = pgvToken.balanceOf(msg.sender);
         if (votingPower == 0) revert NoVotingPower();
@@ -157,32 +186,38 @@ contract Governance is ReentrancyGuard {
             proposal.noVotes += votingPower;
         }
 
-        hasVoted[_id][msg.sender] = true;
-        
-        emit Voted(_id, msg.sender, _support, votingPower);
+        hasVoted[proposalId][msg.sender] = true;
+
+        emit Voted(proposalId, msg.sender, _support, votingPower);
     }
 
+    /** ----------------------------------------
+     *  Finalize Votes
+     * ---------------------------------------- */
     function finalizeVoteTally(
-        uint256 _id,
+        bytes32 proposalId,
         uint256 _totalYesVotes,
         uint256 _totalNoVotes
     ) external {
         if (msg.sender != relayer) revert OnlyRelayer();
-        
-        Proposal storage proposal = proposals[_id];
-        
+
+        Proposal storage proposal = proposals[proposalId];
+
         if (block.timestamp < proposal.endTime) revert VotingPeriodNotEnded();
         if (proposal.voteTallyFinalized) revert VoteAlreadyFinalized();
-        
+
         proposal.finalYesVotes = _totalYesVotes;
         proposal.finalNoVotes = _totalNoVotes;
         proposal.voteTallyFinalized = true;
 
-        emit VoteTallyFinalized(_id, _totalYesVotes, _totalNoVotes);
+        emit VoteTallyFinalized(proposalId, _totalYesVotes, _totalNoVotes);
     }
 
-    function executeProposal(uint256 _id) external nonReentrant {
-        Proposal storage proposal = proposals[_id];
+    /** ----------------------------------------
+     *  Execute Proposal
+     * ---------------------------------------- */
+    function executeProposal(bytes32 proposalId) external nonReentrant {
+        Proposal storage proposal = proposals[proposalId];
 
         if (block.timestamp < proposal.endTime) revert VotingPeriodNotEnded();
         if (!proposal.voteTallyFinalized) revert VoteNotFinalized();
@@ -192,7 +227,18 @@ contract Governance is ReentrancyGuard {
             ? ProposalStatus.Accepted
             : ProposalStatus.Rejected;
 
-        emit ProposalExecuted(_id, proposal.status);
+        emit ProposalExecuted(proposalId, proposal.status);
+    }
+
+    /** ----------------------------------------
+     *  Utility Functions
+     * ---------------------------------------- */
+    function getProposalCount() external view returns (uint256) {
+        return proposalIds.length;
+    }
+
+    function getAllProposalIds() external view returns (bytes32[] memory) {
+        return proposalIds;
     }
 
     function getVotingPower(address _voter) external view returns (uint256) {
