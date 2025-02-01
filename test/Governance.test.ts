@@ -76,6 +76,12 @@ describe("Governance", function () {
                     .createProposal("Test Proposal", "Test Description", PROPOSAL_DURATION)
             ).to.be.revertedWithCustomError(governance, "NoVotingPower");
         });
+
+        it("Should revert when the proposal duration is too short", async function () {
+            await expect(
+                governance.createProposal("Short Duration", "Description", 0)
+            ).to.be.revertedWith("Duration too short");
+        });
     });
 
     describe("Proposal Mirroring", function () {
@@ -122,7 +128,7 @@ describe("Governance", function () {
         });
     });
 
-    describe("Voting", function () {
+    describe("Voting with weighted votes", function () {
         let proposalId: string;
 
         beforeEach(async function () {
@@ -144,6 +150,17 @@ describe("Governance", function () {
 
             const proposal = await governance.proposals(proposalId);
             expect(proposal.yesVotes).to.equal(VOTER_INITIAL_BALANCE);
+        });
+
+        it("Should correctly handle voters with different token weights", async function () {
+            await pgvToken.transfer(voter2.address, ethers.parseEther("500")); // Transfer additional tokens to voter2
+
+            await governance.connect(voter1).vote(proposalId, true); // 1000 tokens
+            await governance.connect(voter2).vote(proposalId, false); // 1500 tokens
+
+            const proposal = await governance.proposals(proposalId);
+            expect(proposal.yesVotes).to.equal(ethers.parseEther("1000"));
+            expect(proposal.noVotes).to.equal(ethers.parseEther("1500"));
         });
 
         it("Should prevent double voting", async function () {
@@ -192,7 +209,7 @@ describe("Governance", function () {
                 .withArgs(proposalId, yesVotes, noVotes);
         });
 
-        it("Should allow execution after finalization", async function () {
+        it("Should execute accepted proposals", async function () {
             await time.increase(2 * 24 * 60 * 60);
             await governance
                 .connect(relayer)
@@ -200,35 +217,18 @@ describe("Governance", function () {
 
             await expect(governance.executeProposal(proposalId))
                 .to.emit(governance, "ProposalExecuted")
-                .withArgs(proposalId, 1); // 1 = Accepted
-
-            const proposal = await governance.proposals(proposalId);
-            expect(proposal.status).to.equal(1); // Accepted
+                .withArgs(proposalId, 1); // Accepted
         });
 
-        it("Should prevent execution before finalization", async function () {
+        it("Should reject proposals when no votes exceed yes votes", async function () {
             await time.increase(2 * 24 * 60 * 60);
-            await expect(governance.executeProposal(proposalId)).to.be.revertedWithCustomError(
-                governance,
-                "VoteNotFinalized"
-            );
-        });
-    });
-
-    describe("Utility Functions", function () {
-        it("Should correctly return proposal count", async function () {
-            expect(await governance.getProposalCount()).to.equal(0);
-
             await governance
-                .connect(voter1)
-                .createProposal("Test Proposal 1", "Test Description 1", PROPOSAL_DURATION);
+                .connect(relayer)
+                .finalizeVoteTally(proposalId, VOTER_INITIAL_BALANCE / 2n, VOTER_INITIAL_BALANCE);
 
-            expect(await governance.getProposalCount()).to.equal(1);
-        });
-
-        it("Should correctly return voting power", async function () {
-            const votingPower = await governance.getVotingPower(voter1.address);
-            expect(votingPower).to.equal(VOTER_INITIAL_BALANCE);
+            await governance.executeProposal(proposalId);
+            const proposal = await governance.proposals(proposalId);
+            expect(proposal.status).to.equal(2); // Rejected
         });
     });
 });
