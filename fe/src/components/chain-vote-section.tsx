@@ -31,7 +31,7 @@ export function ChainVoteSection({ proposal }: ChainVoteSectionProps) {
                 </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-                <div>
+                {/* <div>
                     <label className="text-sm font-medium mb-2 block">Select Chain</label>
                     <Select
                         value={selectedChain}
@@ -54,11 +54,11 @@ export function ChainVoteSection({ proposal }: ChainVoteSectionProps) {
                             ))}
                         </SelectContent>
                     </Select>
-                </div>
+                </div> */}
 
                 <div className="space-y-2">
                     <label className="text-sm font-medium block">Your Vote</label>
-                    <div className="grid grid-cols-3 gap-4">
+                    <div className="grid grid-cols-2 gap-4">
                         <Button
                             variant={voteType === "for" ? "default" : "outline"}
                             onClick={() => setVoteType("for")}
@@ -73,13 +73,13 @@ export function ChainVoteSection({ proposal }: ChainVoteSectionProps) {
                         >
                             Against
                         </Button>
-                        <Button
+                        {/* <Button
                             variant={voteType === "abstain" ? "default" : "outline"}
                             onClick={() => setVoteType("abstain")}
                             className="w-full"
                         >
                             Abstain
-                        </Button>
+                        </Button> */}
                     </div>
                 </div>
 

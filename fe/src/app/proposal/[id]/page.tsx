@@ -71,7 +71,7 @@ export default function ProposalPage({ params }: { params: { id: string } }) {
                             className="h-2"
                         />
                     </div>
-                    <div className="space-y-2">
+                    {/* <div className="space-y-2">
                         <div className="flex justify-between text-sm">
                             <span>Abstain</span>
                             <span>
@@ -83,7 +83,7 @@ export default function ProposalPage({ params }: { params: { id: string } }) {
                             value={(proposal.totalVotes.abstain / proposal.quorum) * 100}
                             className="h-2"
                         />
-                    </div>
+                    </div> */}
                 </CardContent>
             </Card>
 

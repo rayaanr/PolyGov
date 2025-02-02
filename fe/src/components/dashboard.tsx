@@ -17,7 +17,7 @@ export default function Dashboard() {
             : mockProposals.filter((p) => p.votesPerChain.some((v) => v.chain === selectedChain));
 
     return (
-        <div className="container mx-auto p-4 space-y-6">
+        <div className="container mx-auto p-4 space-y-6 mb-44">
             <div className="flex flex-col space-y-2">
                 <h1 className="text-4xl font-bold">Cross-Chain Governance</h1>
                 <p className="text-muted-foreground">
