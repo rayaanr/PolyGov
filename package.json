@@ -13,7 +13,10 @@
         "relay": "bunx ts-node --files relayer/relay.ts",
         "deploy:token": "bunx hardhat run scripts/deploy/token.ts --network bscTestnet & npx hardhat run scripts/deploy/token.ts --network arbitrumTestnet & wait",
         "deploy:bsc": "bunx hardhat run scripts/deploy/deploy-governance.ts --network bscTestnet",
-        "deploy:arb": "bunx hardhat run scripts/deploy/deploy-governance.ts --network arbitrumTestnet"
+        "deploy:arb": "bunx hardhat run scripts/deploy/deploy-governance.ts --network arbitrumTestnet",
+        "dep": "bunx hardhat run ignition/deploy/deploy-pgv-token.ts --network arbitrumTestnet",
+        "gas:bsc": "bunx hardhat run scripts/distributeGas.ts --network bscTestnet",
+        "gas:arb": "bunx hardhat run scripts/distributeGas.ts --network arbitrumTestnet"
     },
     "keywords": [],
     "author": "",
@@ -22,15 +25,15 @@
     "dependencies": {
         "@nomicfoundation/hardhat-toolbox": "^5.0.0",
         "@openzeppelin/contracts": "^5.2.0",
-        "@types/dotenv": "^6.1.1",
         "chai": "^5.1.2",
         "chalk": "^4.1.2",
-        "dotenv": "^16.4.7",
         "hardhat": "^2.22.18",
         "ts-node": "^10.9.2",
         "typescript": "^5.7.3"
     },
     "devDependencies": {
-        "@types/node": "^22.10.7"
+        "@types/dotenv": "^6.1.1",
+        "@types/node": "^22.10.7",
+        "dotenv": "^16.4.7"
     }
 }

@@ -24,3 +24,5 @@ wallets.json
 # Ignore all .env files
 **/.env
 **/.env.*
+
+/constants/accounts.ts
