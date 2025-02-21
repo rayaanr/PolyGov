@@ -1,5 +1,4 @@
 import { ethers } from "hardhat";
-
 import fs from "fs";
 import path from "path";
 import dotenv from "dotenv";
@@ -13,7 +12,7 @@ async function getChainId(): Promise<string> {
     return network.chainId.toString();
 }
 
-// Function to load the PGVToken contract address dynamically
+// Function to load the PGVToken contract address dynamically from Ignition deployment
 async function getTokenAddress(): Promise<string> {
     const chainId = await getChainId();
     const deploymentPath = path.join(
@@ -23,7 +22,7 @@ async function getTokenAddress(): Promise<string> {
 
     try {
         const deploymentData = JSON.parse(fs.readFileSync(deploymentPath, "utf8"));
-        const tokenAddress = deploymentData["PGVTokenModule#PGVToken"]; // Key from your JSON
+        const tokenAddress = deploymentData["PGVTokenModule#PGVToken"]; // Key from JSON
         if (!tokenAddress) throw new Error("Token address not found in deployment JSON");
 
         console.log(`✅ PGVToken Address for Chain ID ${chainId}: ${tokenAddress}`);
@@ -40,19 +39,26 @@ const MAX_TOKENS = 2000;
 const TOTAL_ALLOCATION = 7500; // 75% of 10,000
 const DECIMALS = 18;
 
-// Extract Addresses from testAccounts
-const recipients = testAccounts.map((account) => account.address);
+// Extract Unique Addresses from testAccounts
+const recipients = [...new Set(testAccounts.map((account) => account.address))];
 
-// Function to generate random allocations ensuring sum = TOTAL_ALLOCATION
+// Function to generate random allocations ensuring sum = TOTAL_ALLOCATION with strict MAX cap
 const generateAllocations = (numRecipients: number, total: number, min: number, max: number) => {
     let allocations: number[] = Array(numRecipients).fill(min);
     let remaining = total - numRecipients * min;
 
     while (remaining > 0) {
         for (let i = 0; i < numRecipients && remaining > 0; i++) {
-            let addAmount = Math.min(Math.floor(Math.random() * (max - min + 1)), remaining);
-            allocations[i] += addAmount;
-            remaining -= addAmount;
+            let availableSpace = max - allocations[i]; // Ensure no one exceeds max limit
+            if (availableSpace > 0) {
+                let addAmount = Math.min(
+                    Math.floor(Math.random() * (max - min + 1)),
+                    remaining,
+                    availableSpace
+                );
+                allocations[i] += addAmount;
+                remaining -= addAmount;
+            }
         }
     }
 
