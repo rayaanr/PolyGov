@@ -18,7 +18,8 @@
         "gas:bsc": "GAS_AMOUNT=0.02 bunx hardhat run scripts/distributeGas.ts --network bscTestnet",
         "gas:arb": "GAS_AMOUNT=0.005 bunx hardhat run scripts/distributeGas.ts --network arbitrumTestnet",
         "dep:token": "bunx hardhat run ignition/deploy/deploy-pgv-token.ts --network bscTestnet & bunx hardhat run ignition/deploy/deploy-pgv-token.ts --network arbitrumTestnet & wait",
-        "dist:token": "bunx hardhat run scripts/distributeTokens.ts --network bscTestnet && bunx hardhat run scripts/distributeTokens.ts --network arbitrumTestnet"
+        "dist:token": "bunx hardhat run scripts/distributeTokens.ts --network bscTestnet && bunx hardhat run scripts/distributeTokens.ts --network arbitrumTestnet",
+        "dep:gov:bsc": "bunx hardhat run ignition/deploy/deploy-governance.ts --network bscTestnet"
     },
     "keywords": [],
     "author": "",

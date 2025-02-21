@@ -2,10 +2,11 @@
 pragma solidity ^0.8.28;
 
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Votes.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 
-contract Governance is ReentrancyGuard {
-    IERC20 public pgvToken;
+contract Governance is ReentrancyGuard, Ownable {
+    ERC20Votes public governanceToken;
     address public relayer;
 
     enum ProposalStatus {
@@ -22,6 +23,8 @@ contract Governance is ReentrancyGuard {
         uint256 noVotes;
         uint256 startTime;
         uint256 endTime;
+        uint256 snapshotTimestamp; // Use timestamp instead of block number
+        uint256 snapshotBlock;
         ProposalStatus status;
         uint256 finalYesVotes;
         uint256 finalNoVotes;
@@ -41,13 +44,15 @@ contract Governance is ReentrancyGuard {
     error ExecutionFailed();
     error VoteNotFinalized();
     error VoteAlreadyFinalized();
+    error InvalidToken();
 
     event ProposalCreated(
         bytes32 indexed id,
         string title,
         string description,
         uint256 startTime,
-        uint256 endTime
+        uint256 endTime,
+        uint256 snapshotTimestamp
     );
 
     event ProposalMirrored(
@@ -55,7 +60,9 @@ contract Governance is ReentrancyGuard {
         string title,
         string description,
         uint256 startTime,
-        uint256 endTime
+        uint256 endTime,
+        uint256 snapshotTimestamp,
+        uint256 snapshotBlock
     );
 
     event VoteTallyFinalized(
@@ -73,25 +80,47 @@ contract Governance is ReentrancyGuard {
         uint256 weight
     );
 
-    constructor(address _pgvToken, address _relayer) {
-        pgvToken = IERC20(_pgvToken);
-        relayer = _relayer;
+    event TokenUpdated(address indexed newToken);
+
+    struct GovernanceConfig {
+        address governanceToken;
+        address relayer;
+    }
+
+    constructor(GovernanceConfig memory config) Ownable(msg.sender) {
+        require(config.governanceToken != address(0), "Invalid token address");
+        require(config.relayer != address(0), "Invalid relayer address");
+
+        governanceToken = ERC20Votes(config.governanceToken);
+        relayer = config.relayer;
     }
 
     /** --------------------------------------
-     *  Create Proposal with Unique UUID
+     *  Admin: Update Governance Token Address
+     * -------------------------------------- */
+    function updateGovernanceToken(address _newToken) external onlyOwner {
+        require(_newToken != address(0), "Invalid token address");
+        governanceToken = ERC20Votes(_newToken);
+        emit TokenUpdated(_newToken);
+    }
+
+    /** --------------------------------------
+     *  Create Proposal with Unique UUID (Timestamp-Based Snapshot)
      * -------------------------------------- */
     function createProposal(
         string memory _title,
         string memory _description,
-        uint256 _durationDays
+        uint256 _durationHours
     ) external nonReentrant {
-        require(_durationDays >= 1, "Duration too short");
+        require(_durationHours >= 1, "Duration too short");
 
-        uint256 currentBalance = pgvToken.balanceOf(msg.sender);
-        if (currentBalance < 100 * 10 ** 18) {
+        uint256 votingPower = governanceToken.getVotes(msg.sender);
+        if (votingPower < 100 * 10 ** 18) {
             revert NoVotingPower();
         }
+
+        // Take a snapshot of the voting power timestamp
+        uint256 snapshotTimestamp = block.timestamp;
 
         // Generate the unique proposal ID (UUID)
         bytes32 proposalId = keccak256(
@@ -110,14 +139,15 @@ contract Governance is ReentrancyGuard {
             yesVotes: 0,
             noVotes: 0,
             startTime: block.timestamp,
-            endTime: block.timestamp + (_durationDays * 1 days),
+            endTime: block.timestamp + (_durationHours * 1 hours),
+            snapshotTimestamp: snapshotTimestamp,
+            snapshotBlock: block.number - 1, // Default to current chain block
             status: ProposalStatus.Pending,
             finalYesVotes: 0,
             finalNoVotes: 0,
             voteTallyFinalized: false
         });
 
-        // Store the UUID in the array for easy querying
         proposalIds.push(proposalId);
 
         emit ProposalCreated(
@@ -125,7 +155,8 @@ contract Governance is ReentrancyGuard {
             _title,
             _description,
             block.timestamp,
-            block.timestamp + (_durationDays * 1 days)
+            block.timestamp + (_durationHours * 1 hours),
+            snapshotTimestamp
         );
     }
 
@@ -137,7 +168,9 @@ contract Governance is ReentrancyGuard {
         string memory _title,
         string memory _description,
         uint256 _startTime,
-        uint256 _endTime
+        uint256 _endTime,
+        uint256 _snapshotTimestamp,
+        uint256 _snapshotBlock // Closest block found on this chain
     ) external nonReentrant {
         if (msg.sender != relayer) revert OnlyRelayer();
         if (proposals[proposalId].startTime != 0)
@@ -151,6 +184,8 @@ contract Governance is ReentrancyGuard {
             noVotes: 0,
             startTime: _startTime,
             endTime: _endTime,
+            snapshotTimestamp: _snapshotTimestamp,
+            snapshotBlock: _snapshotBlock, // Use closest block from relayer
             status: ProposalStatus.Pending,
             finalYesVotes: 0,
             finalNoVotes: 0,
@@ -164,12 +199,14 @@ contract Governance is ReentrancyGuard {
             _title,
             _description,
             _startTime,
-            _endTime
+            _endTime,
+            _snapshotTimestamp,
+            _snapshotBlock
         );
     }
 
     /** ----------------------------------------
-     *  Voting Logic
+     *  Voting Logic (Timestamp-Based Snapshot)
      * ---------------------------------------- */
     function vote(bytes32 proposalId, bool _support) external nonReentrant {
         Proposal storage proposal = proposals[proposalId];
@@ -177,7 +214,11 @@ contract Governance is ReentrancyGuard {
         if (block.timestamp >= proposal.endTime) revert VotingPeriodEnded();
         if (hasVoted[proposalId][msg.sender]) revert AlreadyVoted();
 
-        uint256 votingPower = pgvToken.balanceOf(msg.sender);
+        // Use past voting power from snapshot
+        uint256 votingPower = governanceToken.getPastVotes(
+            msg.sender,
+            proposal.snapshotBlock
+        );
         if (votingPower == 0) revert NoVotingPower();
 
         if (_support) {
@@ -242,6 +283,6 @@ contract Governance is ReentrancyGuard {
     }
 
     function getVotingPower(address _voter) external view returns (uint256) {
-        return pgvToken.balanceOf(_voter);
+        return governanceToken.getVotes(_voter);
     }
 }
