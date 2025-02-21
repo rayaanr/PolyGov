@@ -1,14 +1,25 @@
-import { ethers } from "hardhat";
+import { ethers, network } from "hardhat";
 import * as dotenv from "dotenv";
 import { testAccounts } from "../constants/accounts";
 
 dotenv.config();
 
-// Amount of gas (ETH/BNB) to send
-const GAS_AMOUNT = ethers.parseEther("0.05");
+// Get the gas amount from an environment variable
+const inputAmount = process.env.GAS_AMOUNT;
+
+if (!inputAmount) {
+    console.error("❌ Please provide the amount of ETH/BNB to send via GAS_AMOUNT env variable!");
+    process.exit(1);
+}
+
+const GAS_AMOUNT = ethers.parseEther(inputAmount);
 
 async function distributeGas() {
-    console.log("\n🔹 Starting Gas Distribution...\n");
+    console.log(
+        `\n🔹 Starting Gas Distribution (Amount: ${inputAmount} ${
+            network.name === "bscTestnet" ? "BNB" : "ETH"
+        }) 🔹\n`
+    );
 
     const [deployer] = await ethers.getSigners();
 
@@ -19,7 +30,7 @@ async function distributeGas() {
                 value: GAS_AMOUNT,
             });
 
-            console.log(`✅ Sent ${ethers.formatEther(GAS_AMOUNT)} ETH/BNB to ${account.address}`);
+            console.log(`✅ Sent ${inputAmount} ETH/BNB to ${account.address}`);
             console.log(`   Transaction Hash: ${tx.hash}\n`);
 
             await tx.wait(); // Wait for confirmation
@@ -28,7 +39,7 @@ async function distributeGas() {
         }
     }
 
-    console.log("\n✅ Gas distribution complete!\n");
+    console.log("\n✅ Gas distribution completed successfully on ", network.name);
 }
 
 distributeGas()

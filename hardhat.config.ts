@@ -23,16 +23,16 @@ const config: HardhatUserConfig = {
             bscTestnet: process.env.BSCSCAN_API_KEY!,
             arbitrumTestnet: "I2GDHYCNDURPR4U8JFYG3DN747QKUVXKM8",
         },
-        // customChains: [
-        //     {
-        //         network: "arbitrumTestnet",
-        //         chainId: 421614,
-        //         urls: {
-        //             apiURL: "https://api-sepolia.arbiscan.io/api",
-        //             browserURL: "https://sepolia.arbiscan.io/",
-        //         },
-        //     },
-        // ],
+        customChains: [
+            {
+                network: "arbitrumTestnet",
+                chainId: 421614,
+                urls: {
+                    apiURL: "https://api-sepolia.arbiscan.io/api",
+                    browserURL: "https://sepolia.arbiscan.io/",
+                },
+            },
+        ],
     },
     typechain: {
         outDir: "typechain-types",

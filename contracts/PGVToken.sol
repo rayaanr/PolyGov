@@ -5,7 +5,7 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Votes.sol";
 
-contract GovernanceToken is ERC20, ERC20Permit, ERC20Votes {
+contract PGVToken is ERC20, ERC20Permit, ERC20Votes {
     constructor(
         string memory name,
         string memory symbol,
