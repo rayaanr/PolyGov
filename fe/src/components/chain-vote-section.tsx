@@ -3,15 +3,8 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@/components/ui/select";
 import { Progress } from "@/components/ui/progress";
-import type { Chain, Proposal } from "@/lib/types";
+import type { Proposal } from "@/lib/types";
 import { chainColors } from "@/lib/mock-data";
 
 interface ChainVoteSectionProps {
@@ -19,7 +12,6 @@ interface ChainVoteSectionProps {
 }
 
 export function ChainVoteSection({ proposal }: ChainVoteSectionProps) {
-    const [selectedChain, setSelectedChain] = useState<Chain>("ethereum");
     const [voteType, setVoteType] = useState<"for" | "against" | "abstain" | null>(null);
 
     return (

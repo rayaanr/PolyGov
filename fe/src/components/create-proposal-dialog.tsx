@@ -26,7 +26,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { PlusIcon } from "lucide-react";
 import { useCreateProposal } from "@/hooks/useCreateProposal";
-import { toast } from "sonner";
 
 const formSchema = z.object({
     title: z.string().min(5, "Title must be at least 5 characters"),

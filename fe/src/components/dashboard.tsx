@@ -9,7 +9,7 @@ import { StatsGrid } from "./stats-grid";
 import { CreateProposalDialog } from "./create-proposal-dialog";
 
 export default function Dashboard() {
-    const [selectedChain, setSelectedChain] = useState<Chain | "all">("all");
+    const [selectedChain] = useState<Chain | "all">("all");
 
     const filteredProposals =
         selectedChain === "all"
@@ -18,16 +18,16 @@ export default function Dashboard() {
 
     return (
         <div className="container mx-auto p-4 space-y-6 mb-44">
-            <div className="flex flex-col space-y-2">
+            {/* <div className="flex flex-col space-y-2">
                 <h1 className="text-4xl font-bold">Cross-Chain Governance</h1>
                 <p className="text-muted-foreground">
                     Manage and vote on proposals across multiple chains
                 </p>
-            </div>
+            </div> */}
 
-            <StatsGrid stats={mockStats} />
+            {/* <StatsGrid stats={mockStats} /> */}
 
-            <Separator className="my-6" />
+            {/* <Separator className="my-6" /> */}
 
             <div className="space-y-4">
                 <div className="flex items-center justify-between">

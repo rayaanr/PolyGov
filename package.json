@@ -13,7 +13,8 @@
         "relay": "bunx ts-node --files relayer/relay.ts",
         "deploy:token": "bunx hardhat run scripts/deploy/token.ts --network bscTestnet & npx hardhat run scripts/deploy/token.ts --network arbitrumTestnet & wait",
         "deploy:bsc": "bunx hardhat run scripts/deploy/deploy-governance.ts --network bscTestnet",
-        "deploy:arb": "bunx hardhat run scripts/deploy/deploy-governance.ts --network arbitrumTestnet"
+        "deploy:arb": "bunx hardhat run scripts/deploy/deploy-governance.ts --network arbitrumTestnet",
+        "dist:token": "bunx hardhat run scripts/distributeTokens.ts --network bscTestnet && bunx hardhat run scripts/distributeTokens.ts --network arbitrumTestnet"
     },
     "keywords": [],
     "author": "",
