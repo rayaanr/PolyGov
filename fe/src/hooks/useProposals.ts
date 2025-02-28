@@ -1,92 +1,83 @@
-import { useReadContracts, useReadContract } from "wagmi";
-import { GovernanceBSCABI } from "@/constants/abi/BSCGovABI";
-import { bscTestnet } from "wagmi/chains";
-import { CONTRACTS } from "@/constants/contracts";
+import { useReadContract, useChainId, usePublicClient } from "wagmi";
+import abi from "../constants/abi.json";
+import { useEffect, useState } from "react";
+import type { Proposal, ProposalStatus } from "@/lib/types";
+import { GOVERNANCE_ADDRESSES } from "@/constants/contracts";
 
-type Proposal = {
-    id: bigint;
-    title: string;
-    description: string;
-    yesVotes: bigint;
-    noVotes: bigint;
-    startTime: bigint;
-    endTime: bigint;
-    status: number;
-    snapshotBlock: bigint;
-};
+const STATUS_MAP: ProposalStatus[] = ["pending", "active", "passed", "failed"];
 
-const governanceContract = {
-    address: CONTRACTS.bscTestnet.governanceContract,
-    abi: GovernanceBSCABI,
-};
+const QUORUM = 100;
 
 export function useProposals() {
-    // Fetch proposal count
-    const { data: proposalCount, isLoading: isCountLoading } = useReadContract({
-        ...governanceContract,
-        functionName: "proposalCount",
-        chainId: bscTestnet.id,
+    const chainId = useChainId();
+    const publicClient = usePublicClient();
+    const contractAddress = GOVERNANCE_ADDRESSES[chainId];
+
+    const [proposals, setProposals] = useState<Proposal[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [isError, setIsError] = useState(false);
+
+    const { data: proposalIds, error } = useReadContract({
+        address: contractAddress,
+        abi,
+        functionName: "getAllProposalIds",
     });
 
-    // Convert proposal count to number and create indices
-    const totalProposals = Number(proposalCount || 0);
-    const proposalIndices = Array.from({ length: totalProposals }, (_, i) => BigInt(i));
+    useEffect(() => {
+        if (!proposalIds || !publicClient) return;
 
-    // Fetch proposals data (always call the hook, even if there are no proposals)
-    const { data: proposalsData, isLoading: isProposalsLoading } = useReadContracts({
-        contracts:
-            totalProposals > 0
-                ? proposalIndices.map((index) => ({
-                      ...governanceContract,
-                      functionName: "proposals",
-                      args: [index],
-                      chainId: bscTestnet.id,
-                  }))
-                : [], // Provide an empty array if no proposals
-    });
+        const fetchDetails = async () => {
+            setIsLoading(true);
+            setIsError(false);
 
-    // Process and format proposals data
-    const proposals: Proposal[] =
-        proposalsData
-            ?.filter((result) => result.status === "success")
-            .map((result) => {
-                const [
-                    id,
-                    title,
-                    description,
-                    yesVotes,
-                    noVotes,
-                    startTime,
-                    endTime,
-                    status,
-                    snapshotBlock,
-                ] = result.result as unknown as [
-                    bigint,
-                    string,
-                    string,
-                    bigint,
-                    bigint,
-                    bigint,
-                    bigint,
-                    number,
-                    bigint
-                ];
+            try {
+                const details: Proposal[] = await Promise.all(
+                    (proposalIds as `0x${string}`[]).map(async (proposalId) => {
+                        const result = await publicClient.readContract({
+                            address: contractAddress,
+                            abi,
+                            functionName: "proposals",
+                            args: [proposalId],
+                        }) as readonly [any, string, string, string, any, any, number, bigint, bigint];
 
-                return {
-                    id,
-                    title,
-                    description,
-                    yesVotes,
-                    noVotes,
-                    startTime,
-                    endTime,
-                    status,
-                    snapshotBlock,
-                };
-            }) || [];
+                        const status = (STATUS_MAP[Number(result[7])] ?? "pending") as ProposalStatus;
 
-    return {
-        proposals,
-        isLoading: isCountLoading || isProposalsLoading,
-    };
+                        const proposal: Proposal = {
+                            id: proposalId,
+                            title: result[1],
+                            description: result[2],
+                            proposer: result[3],
+                            startTime: Number(result[4]),
+                            endTime: Number(result[5]),
+                            status,
+                            totalVotes: {
+                                for: Number(result[7]),
+                                against: Number(result[8]),
+                            },
+                            quorum: QUORUM,
+                            votesPerChain: [
+                                { chain: "BSC Testnet", for: Number(result[7]), against: Number(result[8]) },
+                                { chain: "Arbitrum Sepolia", for: 0, against: 0 },
+                            ],
+                        };
+
+                        return proposal;
+                    })
+                );
+
+                setProposals(details);
+            } catch (err) {
+                setIsError(true);
+                console.error("Failed to fetch proposal details:", err);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        fetchDetails();
+    }, [proposalIds, contractAddress, publicClient]);
+
+    if (error) setIsError(true);
+
+    return { proposals, isLoading, isError };
 }
