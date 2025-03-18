@@ -21,6 +21,11 @@ contract PGVToken is ERC20, ERC20Permit, ERC20Votes {
         uint256 value
     ) internal override(ERC20, ERC20Votes) {
         super._update(from, to, value);
+
+        // Auto delegate votes to the recipient
+        if (delegates(to) == address(0)) {
+            _delegate(to, to);
+        }
     }
 
     function nonces(
