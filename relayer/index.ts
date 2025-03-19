@@ -5,15 +5,6 @@ import path from "path";
 
 dotenv.config();
 
-// Types for type safety
-interface ChainConfig {
-    CHAIN_ID: string;
-    RPC_URL: string;
-    WS_URL: string;
-    CONTRACT: string;
-    LAST_BLOCK_FILE: string;
-}
-
 interface ContractConnections {
     provider: ethers.WebSocketProvider;
     contract: ethers.Contract;
@@ -29,7 +20,7 @@ const CONFIG = {
         CHAIN_ID: "main",
         RPC_URL: process.env.BSC_RPC || "",
         WS_URL: process.env.BSC_WS_URL || "",
-        CONTRACT: "0xa6bA1c44442bf0d579B36201004dD5174061Db31",
+        CONTRACT: "0x4F90cb1474bF846682B267e62cEA52505477B378",
         LAST_BLOCK_FILE: path.join(__dirname, "last_main_block.txt"),
     },
     // Secondary chains configuration
@@ -38,7 +29,7 @@ const CONFIG = {
             CHAIN_ID: "arb",
             RPC_URL: process.env.ARB_RPC || "",
             WS_URL: process.env.ARB_WS_URL || "",
-            CONTRACT: "0x3897EC8be98ccDAc707c8D4B9f8C953eDC237f67",
+            CONTRACT: "0x82ACdE34e54B408E808a8f625648ED4eCe7A745e",
             LAST_BLOCK_FILE: path.join(__dirname, "last_arb_block.txt"),
         },
         // Add more secondary chains as needed
@@ -53,33 +44,6 @@ const MAIN_GOVERNANCE_ABI = JSON.parse(
 const SECONDARY_GOVERNANCE_ABI = JSON.parse(
     fs.readFileSync(path.join(__dirname, "../abi/secondary.json"), "utf8")
 );
-
-/**
- * Read the last processed block from file
- */
-async function readLastBlock(configEntry: ChainConfig, provider: ethers.Provider): Promise<number> {
-    try {
-        if (!fs.existsSync(configEntry.LAST_BLOCK_FILE)) {
-            const currentBlock = await provider.getBlockNumber();
-            const safeStartBlock = Math.max(currentBlock - 100, 0);
-            return safeStartBlock;
-        }
-
-        const blockNumber = parseInt(fs.readFileSync(configEntry.LAST_BLOCK_FILE, "utf8"), 10);
-        return isNaN(blockNumber) ? 0 : blockNumber;
-    } catch (error) {
-        console.warn(`⚠️ Error reading block file for ${configEntry.CHAIN_ID}:`, error);
-        const currentBlock = await provider.getBlockNumber();
-        return Math.max(currentBlock - 100, 0);
-    }
-}
-
-/**
- * Write the last processed block to file
- */
-function writeLastBlock(configEntry: ChainConfig, block: number): void {
-    fs.writeFileSync(configEntry.LAST_BLOCK_FILE, block.toString(), "utf8");
-}
 
 /**
  * Initialize providers and contracts with websocket connections
@@ -107,12 +71,7 @@ async function initializeContracts(): Promise<{
             const signer = new ethers.Wallet(process.env.RELAYER_PVT_KEY, provider);
             const contract = new ethers.Contract(chain.CONTRACT, SECONDARY_GOVERNANCE_ABI, signer);
 
-            secondaryConnections[chain.CHAIN_ID] = {
-                provider,
-                contract,
-                signer,
-            };
-
+            secondaryConnections[chain.CHAIN_ID] = { provider, contract, signer };
             console.log(`🔌 Connected to ${chain.CHAIN_ID} chain`);
         } catch (error) {
             console.error(`❌ Failed to connect to ${chain.CHAIN_ID} chain:`, error);
@@ -120,11 +79,7 @@ async function initializeContracts(): Promise<{
     }
 
     return {
-        main: {
-            provider: mainProvider,
-            contract: mainContract,
-            signer: mainSigner,
-        },
+        main: { provider: mainProvider, contract: mainContract, signer: mainSigner },
         secondary: secondaryConnections,
     };
 }
@@ -143,33 +98,34 @@ function setupMainChainEventListeners(
         console.log(`🆕 New proposal created on main chain: ${id} - ${title}`);
 
         try {
-            // Get the full proposal details
-            const proposal = await mainContract.proposals(id);
+            const proposal = await mainContract.getProposalDetails(id);
 
             // Sync the proposal to all secondary chains
             for (const [chainId, { contract }] of Object.entries(secondaryConnections)) {
                 try {
                     console.log(`🔄 Mirroring proposal ${id} to ${chainId}`);
 
-                    // Check if proposal already exists on secondary chain
-                    const secondaryProposal = await contract.proposals(id);
-
-                    if (secondaryProposal[5] === 0n) {
-                        // startTime = 0 means it doesn't exist
-                        const tx = await contract.mirrorProposal(
-                            id,
-                            proposal[1], // title
-                            proposal[2], // description
-                            proposal[5], // startTime
-                            proposal[6], // endTime
-                            proposal[7] // snapshotBlock
-                        );
-
-                        await tx.wait();
-                        console.log(`✅ Proposal ${id} mirrored to ${chainId}`);
-                    } else {
-                        console.log(`ℹ️ Proposal ${id} already exists on ${chainId}`);
+                    // Try-catch to handle potential errors when checking if proposal already exists
+                    try {
+                        const secondaryProposal = await contract.getProposalDetails(id);
+                        if (secondaryProposal.startTime > 0) {
+                            console.log(`ℹ️ Proposal ${id} already exists on ${chainId}`);
+                            continue;
+                        }
+                    } catch (err) {
+                        // If error, proposal likely doesn't exist, proceed with mirroring
                     }
+
+                    const tx = await contract.mirrorProposal(
+                        id,
+                        proposal.title,
+                        proposal.description,
+                        proposal.startTime,
+                        proposal.endTime
+                    );
+
+                    await tx.wait();
+                    console.log(`✅ Proposal ${id} mirrored to ${chainId}`);
                 } catch (error) {
                     console.error(`❌ Error mirroring proposal to ${chainId}:`, error);
                 }
@@ -179,25 +135,9 @@ function setupMainChainEventListeners(
         }
     });
 
-    // Listen for vote tally finalization events
-    mainContract.on("VoteTallyFinalized", async (id, totalYesVotes, totalNoVotes, event) => {
-        console.log(`🔢 Vote tally finalized for proposal ${id}`);
-
-        try {
-            // Execute the proposal on the main chain
-            const tx = await mainContract.executeProposal(id);
-            await tx.wait();
-            console.log(`✅ Executed proposal ${id} on main chain`);
-        } catch (error) {
-            console.error(`❌ Error executing proposal ${id}:`, error);
-        }
-    });
-
-    // Listen for proposal execution events
     mainContract.on("ProposalExecuted", async (id, status, event) => {
         console.log(`🚀 Proposal ${id} executed on main chain with status: ${status}`);
 
-        // Update the status on all secondary chains
         for (const [chainId, { contract }] of Object.entries(secondaryConnections)) {
             try {
                 const tx = await contract.updateProposalStatus(id, status);
@@ -222,56 +162,65 @@ function setupSecondaryChainEventListeners(
     for (const [chainId, { contract }] of Object.entries(secondaryConnections)) {
         // Listen for vote tally events
         contract.on("VotesTallied", async (proposalId, yesVotes, noVotes, event) => {
-            console.log(`🗳️ Votes tallied for proposal ${proposalId} on ${chainId}`);
+            console.log(
+                `🗳️ Votes tallied for proposal ${proposalId} on ${chainId}: Yes=${yesVotes}, No=${noVotes}`
+            );
 
             try {
                 // Check if votes have already been collected
-                const secondaryVotes = await mainContract.secondaryChainVotes(proposalId, chainId);
-
-                if (!secondaryVotes[2]) {
-                    // if not collected
-                    const tx = await mainContract.collectSecondaryChainVotes(
+                try {
+                    const secondaryVotes = await mainContract.secondaryChainVotes(
                         proposalId,
-                        chainId,
-                        yesVotes,
-                        noVotes
+                        chainId
                     );
 
-                    await tx.wait();
-                    console.log(`✅ Collected votes from ${chainId} for proposal ${proposalId}`);
-
-                    // Check if all secondary chains have reported their votes
-                    let allVotesCollected = true;
-                    const registeredChains = await mainContract.getRegisteredChains();
-
-                    for (const registeredChain of registeredChains) {
-                        const votes = await mainContract.secondaryChainVotes(
-                            proposalId,
-                            registeredChain
+                    // If votes already collected, skip
+                    if (secondaryVotes.collected) {
+                        console.log(
+                            `ℹ️ Votes already collected from ${chainId} for proposal ${proposalId}`
                         );
-                        if (!votes[2]) {
-                            // if not collected
-                            allVotesCollected = false;
-                            break;
-                        }
+                        return;
                     }
+                } catch (err) {
+                    // If error, votes likely not collected yet
+                }
 
-                    // If all votes collected, finalize the tally
-                    if (allVotesCollected) {
-                        const proposal = await mainContract.proposals(proposalId);
+                // Collect votes to main chain
+                const tx = await mainContract.collectSecondaryChainVotes(
+                    proposalId,
+                    chainId,
+                    yesVotes,
+                    noVotes
+                );
 
-                        // Check if the voting period has ended
-                        const currentTime = Math.floor(Date.now() / 1000);
-                        if (Number(proposal[6]) <= currentTime && !proposal[11]) {
-                            const finalizeTx = await mainContract.finalizeVoteTally(proposalId);
-                            await finalizeTx.wait();
-                            console.log(`✅ Finalized vote tally for proposal ${proposalId}`);
-                        }
+                await tx.wait();
+                console.log(`✅ Collected votes from ${chainId} for proposal ${proposalId}`);
+
+                // Check if we can finalize the proposal
+                try {
+                    const proposal = await mainContract.getProposalDetails(proposalId);
+
+                    // Check if voting period has ended and vote not yet finalized
+                    const currentTime = Math.floor(Date.now() / 1000);
+                    const cooldownEndTime = Number(proposal.endTime) + 3 * 60; // 3 minutes cooldown period
+
+                    if (currentTime >= cooldownEndTime && !proposal.voteTallyFinalized) {
+                        console.log(
+                            `⏱️ Cooldown period ended for proposal ${proposalId}, finalizing votes`
+                        );
+
+                        const finalizeTx = await mainContract.finalizeProposalVotes(proposalId);
+                        await finalizeTx.wait();
+                        console.log(`✅ Finalized vote tally for proposal ${proposalId}`);
+                    } else if (currentTime < cooldownEndTime) {
+                        console.log(
+                            `⏳ Waiting for cooldown period to end for proposal ${proposalId}. Time remaining: ${
+                                cooldownEndTime - currentTime
+                            } seconds`
+                        );
                     }
-                } else {
-                    console.log(
-                        `ℹ️ Votes already collected from ${chainId} for proposal ${proposalId}`
-                    );
+                } catch (error) {
+                    console.error(`❌ Error checking proposal finalization status: ${error}`);
                 }
             } catch (error) {
                 console.error(`❌ Error collecting votes from ${chainId}:`, error);
@@ -291,33 +240,37 @@ async function syncExistingProposals(
 
     try {
         // Get all proposal IDs from main chain
-        const proposalIds = await mainContract.getAllProposalIds();
+        const proposalIds = await mainContract.getProposalIds();
         console.log(`📄 Found ${proposalIds.length} proposals on main chain`);
 
         for (const proposalId of proposalIds) {
             try {
                 // Get proposal details from main chain
-                const mainProposal = await mainContract.proposals(proposalId);
+                const mainProposal = await mainContract.getProposalDetails(proposalId);
 
                 // Mirror to all secondary chains if not already mirrored
                 for (const [chainId, { contract }] of Object.entries(secondaryConnections)) {
                     try {
-                        // Check if proposal exists on secondary chain
-                        const secondaryProposal = await contract.proposals(proposalId);
+                        let secondaryProposal;
+                        let proposalExists = true;
 
-                        if (secondaryProposal[5] === 0n) {
-                            // startTime = 0 means it doesn't exist
+                        try {
+                            secondaryProposal = await contract.getProposalDetails(proposalId);
+                        } catch (err) {
+                            proposalExists = false;
+                        }
+
+                        if (!proposalExists || secondaryProposal.startTime === 0n) {
                             console.log(
                                 `🔄 Mirroring existing proposal ${proposalId} to ${chainId}`
                             );
 
                             const tx = await contract.mirrorProposal(
                                 proposalId,
-                                mainProposal[1], // title
-                                mainProposal[2], // description
-                                mainProposal[5], // startTime
-                                mainProposal[6], // endTime
-                                mainProposal[7] // snapshotBlock
+                                mainProposal.title,
+                                mainProposal.description,
+                                mainProposal.startTime,
+                                mainProposal.endTime
                             );
 
                             await tx.wait();
@@ -325,11 +278,14 @@ async function syncExistingProposals(
                         } else {
                             console.log(`✓ Proposal ${proposalId} already exists on ${chainId}`);
 
-                            // Update status if proposal is executed on main chain but not on secondary
-                            if (mainProposal[8] !== 0 && secondaryProposal[8] === 0) {
+                            // Update status if proposal has a different status on main vs secondary
+                            if (
+                                mainProposal.status !== secondaryProposal.status &&
+                                mainProposal.status !== 0
+                            ) {
                                 const tx = await contract.updateProposalStatus(
                                     proposalId,
-                                    mainProposal[8]
+                                    mainProposal.status
                                 );
                                 await tx.wait();
                                 console.log(
@@ -364,87 +320,93 @@ async function processEndedProposals(
 
     try {
         // Get all proposal IDs from main chain
-        const proposalIds = await mainContract.getAllProposalIds();
+        const proposalIds = await mainContract.getProposalIds();
         const currentTime = Math.floor(Date.now() / 1000);
 
         for (const proposalId of proposalIds) {
             try {
-                const mainProposal = await mainContract.proposals(proposalId);
+                const mainProposal = await mainContract.getProposalDetails(proposalId);
 
                 // Skip if voting period hasn't ended
-                if (Number(mainProposal[6]) > currentTime) {
+                if (Number(mainProposal.endTime) > currentTime) {
                     continue;
                 }
 
-                // Skip if already executed
-                if (mainProposal[8] !== 0) {
+                // Skip if already finalized
+                if (mainProposal.voteTallyFinalized) {
                     continue;
                 }
 
-                // Collect votes from secondary chains if not already collected
-                let allVotesCollected = true;
+                // Process secondary chain votes if not already finalized
                 const registeredChains = await mainContract.getRegisteredChains();
 
                 for (const chainId of registeredChains) {
                     if (!secondaryConnections[chainId]) continue;
 
-                    const votes = await mainContract.secondaryChainVotes(proposalId, chainId);
+                    try {
+                        const { contract } = secondaryConnections[chainId];
+                        let secondaryVotes;
 
-                    if (!votes[2]) {
-                        // if not collected
-                        allVotesCollected = false;
-
-                        // Tally votes on secondary chain
                         try {
-                            const { contract } = secondaryConnections[chainId];
-                            const secondaryProposal = await contract.proposals(proposalId);
+                            secondaryVotes = await mainContract.secondaryChainVotes(
+                                proposalId,
+                                chainId
+                            );
 
-                            if (!secondaryProposal[9]) {
-                                // if not tallied
-                                console.log(`🗳️ Tallying votes for ${proposalId} on ${chainId}`);
-                                const tx = await contract.tallyVotes(proposalId);
-                                await tx.wait();
-                                console.log(`✅ Votes tallied for ${proposalId} on ${chainId}`);
+                            if (secondaryVotes.collected) {
+                                continue; // Votes already collected
                             }
+                        } catch (err) {
+                            // If error, votes likely not collected yet
+                        }
+
+                        // Check if votes have been tallied on secondary chain
+                        const secondaryProposal = await contract.getProposalDetails(proposalId);
+
+                        if (
+                            !secondaryProposal.voteTallied &&
+                            Number(secondaryProposal.endTime) <= currentTime
+                        ) {
+                            console.log(`🗳️ Finalizing votes for ${proposalId} on ${chainId}`);
+                            const tx = await contract.finalizeVotes(proposalId);
+                            await tx.wait();
+                            console.log(`✅ Votes finalized for ${proposalId} on ${chainId}`);
+
+                            // Get updated proposal with vote counts
+                            const updatedProposal = await contract.getProposalDetails(proposalId);
 
                             // Collect votes to main chain
                             const collectTx = await mainContract.collectSecondaryChainVotes(
                                 proposalId,
                                 chainId,
-                                secondaryProposal[3], // yesVotes
-                                secondaryProposal[4] // noVotes
+                                updatedProposal.yesVotes,
+                                updatedProposal.noVotes
                             );
 
                             await collectTx.wait();
                             console.log(
                                 `✅ Collected votes from ${chainId} for proposal ${proposalId}`
                             );
-                        } catch (error) {
-                            console.error(
-                                `❌ Error collecting votes from ${chainId} for ${proposalId}:`,
-                                error
-                            );
                         }
+                    } catch (error) {
+                        console.error(
+                            `❌ Error processing votes from ${chainId} for ${proposalId}:`,
+                            error
+                        );
                     }
                 }
 
-                // Finalize vote tally if all votes collected and not already finalized
-                if (allVotesCollected && !mainProposal[11]) {
+                // Check if cooldown period has passed (3 minutes after voting ends)
+                const cooldownEndTime = Number(mainProposal.endTime) + 3 * 60;
+
+                if (currentTime >= cooldownEndTime && !mainProposal.voteTallyFinalized) {
                     try {
                         console.log(`🔢 Finalizing vote tally for proposal ${proposalId}`);
-                        const finalizeTx = await mainContract.finalizeVoteTally(proposalId);
+                        const finalizeTx = await mainContract.finalizeProposalVotes(proposalId);
                         await finalizeTx.wait();
                         console.log(`✅ Finalized vote tally for proposal ${proposalId}`);
-
-                        // Execute proposal
-                        const executeTx = await mainContract.executeProposal(proposalId);
-                        await executeTx.wait();
-                        console.log(`✅ Executed proposal ${proposalId}`);
                     } catch (error) {
-                        console.error(
-                            `❌ Error finalizing/executing proposal ${proposalId}:`,
-                            error
-                        );
+                        console.error(`❌ Error finalizing proposal ${proposalId}:`, error);
                     }
                 }
             } catch (error) {
@@ -578,10 +540,10 @@ function scheduleRecurringTasks(
     mainContract: ethers.Contract,
     secondaryConnections: Record<string, ContractConnections>
 ) {
-    // Process ended proposals every 5 minutes
+    // Process ended proposals every 2 minutes
     setInterval(async () => {
         await processEndedProposals(mainContract, secondaryConnections);
-    }, 5 * 60 * 1000);
+    }, 2 * 60 * 1000);
 
     // Sync existing proposals every hour
     setInterval(async () => {

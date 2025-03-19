@@ -1,14 +1,15 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.17;
+pragma solidity ^0.8.28;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Votes.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
 /**
  * @title SecondaryGovernance
  * @dev Secondary chain governance contract that mirrors proposals from main chain
  */
-contract SecondaryGovernance is Ownable {
+contract SecondaryGovernance is Ownable, ReentrancyGuard {
     ERC20Votes public governanceToken;
     address public relayer;
     string public chainId;
@@ -28,18 +29,18 @@ contract SecondaryGovernance is Ownable {
         uint256 noVotes;
         uint256 startTime;
         uint256 endTime;
-        uint256 snapshotBlock;
         ProposalStatus status;
         bool voteTallied;
     }
 
     // Storage
-    mapping(bytes32 => Proposal) public proposals;
-    mapping(bytes32 => mapping(address => bool)) public hasVoted;
-    bytes32[] public proposalIds;
+    mapping(bytes32 => Proposal) proposals;
+    mapping(bytes32 => mapping(address => bool)) hasVoted;
+    bytes32[] proposalIds;
 
     // Events
     event ProposalMirrored(bytes32 indexed id, string title, uint256 endTime);
+    event RelayerUpdated(address indexed newRelayer);
     event Voted(
         bytes32 indexed proposalId,
         address voter,
@@ -82,6 +83,7 @@ contract SecondaryGovernance is Ownable {
     function updateRelayer(address _newRelayer) external onlyOwner {
         require(_newRelayer != address(0), "Invalid relayer address");
         relayer = _newRelayer;
+        emit RelayerUpdated(_newRelayer);
     }
 
     /**
@@ -92,16 +94,12 @@ contract SecondaryGovernance is Ownable {
         string memory _title,
         string memory _description,
         uint256 _startTime,
-        uint256 _endTime,
-        uint256 _snapshotTimestamp
+        uint256 _endTime
     ) external onlyRelayer {
         require(
             proposals[proposalId].startTime == 0,
             "Proposal already exists"
         );
-
-        // Find closest block to snapshot timestamp
-        uint256 closestBlock = findClosestBlockToTimestamp(_snapshotTimestamp);
 
         proposals[proposalId] = Proposal({
             id: proposalId,
@@ -111,7 +109,6 @@ contract SecondaryGovernance is Ownable {
             noVotes: 0,
             startTime: _startTime,
             endTime: _endTime,
-            snapshotBlock: closestBlock,
             status: ProposalStatus.Pending,
             voteTallied: false
         });
@@ -122,28 +119,9 @@ contract SecondaryGovernance is Ownable {
     }
 
     /**
-     * @dev Find closest block to a timestamp (simplified version)
-     */
-    function findClosestBlockToTimestamp(
-        uint256 timestamp
-    ) internal view returns (uint256) {
-        uint256 currentBlock = block.number;
-        uint256 currentTime = block.timestamp;
-
-        // Estimate based on average block time (assumes 2 seconds per block)
-        uint256 blockTimeDiff = (currentTime - timestamp) / 2;
-
-        if (currentBlock <= blockTimeDiff) {
-            return 1;
-        }
-
-        return currentBlock - blockTimeDiff;
-    }
-
-    /**
      * @dev Vote on a proposal
      */
-    function vote(bytes32 proposalId, bool support) external {
+    function castVote(bytes32 proposalId, bool support) external {
         Proposal storage proposal = proposals[proposalId];
 
         require(proposal.startTime > 0, "Proposal doesn't exist");
@@ -153,7 +131,7 @@ contract SecondaryGovernance is Ownable {
         // Get voting power from snapshot
         uint256 votingPower = governanceToken.getPastVotes(
             msg.sender,
-            proposal.snapshotBlock
+            proposal.startTime
         );
         require(votingPower > 0, "No voting power");
 
@@ -172,13 +150,14 @@ contract SecondaryGovernance is Ownable {
     /**
      * @dev Tally votes to be collected by the relayer
      */
-    function tallyVotes(bytes32 proposalId) external onlyRelayer {
+    function finalizeVotes(bytes32 proposalId) external onlyRelayer {
         Proposal storage proposal = proposals[proposalId];
 
         require(block.timestamp >= proposal.endTime, "Voting period not ended");
         require(!proposal.voteTallied, "Votes already tallied");
 
         proposal.voteTallied = true;
+        proposal.endTime = block.timestamp;     // This will prevebt future voting on this proposal
 
         emit VotesTallied(proposalId, proposal.yesVotes, proposal.noVotes);
     }
@@ -192,6 +171,7 @@ contract SecondaryGovernance is Ownable {
     ) external onlyRelayer {
         Proposal storage proposal = proposals[proposalId];
         require(proposal.startTime > 0, "Proposal doesn't exist");
+        require(proposal.voteTallied, "Votes not finalized");
 
         proposal.status = _status;
 
@@ -201,8 +181,41 @@ contract SecondaryGovernance is Ownable {
     /**
      * @dev Get all proposal IDs
      */
-    function getAllProposalIds() external view returns (bytes32[] memory) {
+    function getProposalIds() external view returns (bytes32[] memory) {
         return proposalIds;
+    }
+
+    /**
+     * @dev Get proposal details
+     */
+    function getProposalDetails(
+        bytes32 proposalId
+    ) external view returns (Proposal memory) {
+        Proposal storage proposal = proposals[proposalId];
+        require(proposal.startTime > 0, "Proposal doesn't exist");
+        return proposal;
+    }
+
+    /**
+     * @dev Check if user has voted on a proposal
+     */
+    function hasUserVoted(
+        bytes32 proposalId,
+        address user
+    ) external view returns (bool) {
+        return hasVoted[proposalId][user];
+    }
+
+    /**
+     * @dev Get the voting power of a user at the time of proposal creation
+     */
+    function getUserVotingPowerAtProposal(
+        bytes32 proposalId,
+        address user
+    ) external view returns (uint256) {
+        Proposal storage proposal = proposals[proposalId];
+        require(proposal.startTime > 0, "Proposal doesn't exist");
+        return governanceToken.getPastVotes(user, proposal.startTime);
     }
 
     /**
