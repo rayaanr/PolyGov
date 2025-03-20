@@ -214,8 +214,8 @@ contract MainGovernance is Ownable, ReentrancyGuard {
         Proposal storage proposal = proposals[proposalId];
 
         require(proposal.startTime > 0, "Proposal doesn't exist");
-        // Wait for cooldown period of 3 mins after voting ends, This is to ensure that the relayer has enough time to collect votes from all secondary chains
-        require(block.timestamp >= proposal.endTime + 3 minutes, "Cooldown period not ended");
+        // Wait for cooldown period of 1 mins after voting ends, This is to ensure that the relayer has enough time to collect votes from all secondary chains
+        require(block.timestamp >= proposal.endTime + 1 minutes, "Cooldown period not ended");
         require(block.timestamp >= proposal.endTime, "Voting period not ended");
         require(!proposal.voteTallyFinalized, "Vote already finalized");
 
