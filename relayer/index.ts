@@ -344,6 +344,9 @@ async function processEndedProposals(
         for (const proposalId of proposalIds) {
             try {
                 const mainProposal = await mainContract.getProposalDetails(proposalId);
+                console.log(
+                    `🔍 Checking proposal ${proposalId} - End Time: ${mainProposal.endTime}, Finalized: ${mainProposal.voteTallyFinalized}`
+                );
 
                 if (Number(mainProposal.endTime) > currentTime || mainProposal.voteTallyFinalized) {
                     console.log(
@@ -364,7 +367,11 @@ async function processEndedProposals(
 
                         try {
                             secondaryProposal = await contract.getProposalDetails(proposalId);
+                            console.log(
+                                `ℹ️ Proposal ${proposalId} on ${chainId} - VoteTallied: ${secondaryProposal.voteTallied}`
+                            );
                         } catch (err) {
+                            console.log(`⚠️ Proposal ${proposalId} not found on ${chainId}`);
                             proposalExists = false;
                         }
 
@@ -390,18 +397,28 @@ async function processEndedProposals(
                             secondaryProposal = await contract.getProposalDetails(proposalId);
                         }
 
+                        // Check if votes are already collected before proceeding
+                        let votesCollected = false;
                         try {
                             const secondaryVotes = await mainContract.secondaryChainVotes(
                                 proposalId,
                                 chainId
                             );
-                            if (secondaryVotes.collected) {
+                            votesCollected = secondaryVotes.collected;
+                            console.log(
+                                `ℹ️ Votes collected status for ${proposalId} on ${chainId}: ${votesCollected}`
+                            );
+                            if (votesCollected) {
                                 console.log(
-                                    `ℹ️ Votes already collected for ${proposalId} from ${chainId}`
+                                    `⏩ Skipping vote collection for ${proposalId} on ${chainId} - votes already collected`
                                 );
                                 continue;
                             }
-                        } catch (err) {}
+                        } catch (err) {
+                            console.log(
+                                `⚠️ Could not check vote collection status for ${proposalId} on ${chainId}, proceeding`
+                            );
+                        }
 
                         if (
                             !secondaryProposal.voteTallied &&
@@ -414,7 +431,7 @@ async function processEndedProposals(
                             secondaryProposal = await contract.getProposalDetails(proposalId);
                         }
 
-                        if (secondaryProposal.voteTallied) {
+                        if (secondaryProposal.voteTallied && !votesCollected) {
                             console.log(`📊 Collecting votes for ${proposalId} from ${chainId}`);
                             const collectTx = await mainContract.collectSecondaryChainVotes(
                                 proposalId,
@@ -425,6 +442,14 @@ async function processEndedProposals(
                             await collectTx.wait();
                             console.log(
                                 `✅ Collected votes from ${chainId} for proposal ${proposalId}`
+                            );
+                        } else if (votesCollected) {
+                            console.log(
+                                `⏩ Votes already collected for ${proposalId} on ${chainId}, skipping`
+                            );
+                        } else {
+                            console.log(
+                                `⚠️ Votes not tallied for ${proposalId} on ${chainId}, cannot collect`
                             );
                         }
                     } catch (error) {
