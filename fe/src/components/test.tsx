@@ -2,22 +2,11 @@
 
 import { MAIN_CONFIG } from "@/constants/config";
 import { GET_PROPOSAL_DETAILS_KEY, GET_PROPOSAL_IDS_KEY } from "@/constants/keys";
+import { ProposalDetails } from "@/lib/types";
 import { formatDate, formatVotes, getStatusText } from "@/lib/utils";
 import { useReadContract, useReadContracts } from "wagmi";
 
-interface ProposalDetails {
-    proposalId: string;
-    title: string;
-    description: string;
-    yesVotes: bigint;
-    noVotes: bigint;
-    startTime: bigint;
-    endTime: bigint;
-    status: number;
-    finalYesVotes: bigint;
-    finalNoVotes: bigint;
-    voteTallyFinalized: boolean;
-}
+
 
 const ProposalList = () => {
     // Get all proposal IDs

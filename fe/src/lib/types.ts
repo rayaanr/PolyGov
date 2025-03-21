@@ -33,3 +33,20 @@ export interface GovernanceStats {
     totalVoters: number;
     averageParticipation: number;
 }
+
+
+//---------------------
+
+export interface ProposalDetails {
+    proposalId: string;
+    title: string;
+    description: string;
+    yesVotes: bigint;
+    noVotes: bigint;
+    startTime: bigint;
+    endTime: bigint;
+    status: number;
+    finalYesVotes: bigint;
+    finalNoVotes: bigint;
+    voteTallyFinalized: boolean;
+}
