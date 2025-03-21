@@ -1,0 +1,3 @@
+export const CREATE_PROPOSAL_KEY = "createProposal"
+export const GET_PROPOSAL_IDS_KEY = "getProposalIds"
+export const GET_PROPOSAL_DETAILS_KEY = "getProposalDetails"

@@ -26,7 +26,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { PlusIcon } from "lucide-react";
 import { useCreateProposal } from "@/hooks/useCreateProposal";
-import { toast } from "sonner";
 
 const formSchema = z.object({
     title: z.string().min(5, "Title must be at least 5 characters"),
@@ -35,9 +34,9 @@ const formSchema = z.object({
         .date()
         .min(new Date(), "End date must be in the future")
         .refine((date) => {
-            const days = (date.getTime() - Date.now()) / (1000 * 60 * 60 * 24);
-            return days <= 30;
-        }, "Voting duration cannot exceed 30 days"),
+            const minutes = (date.getTime() - Date.now()) / (1000 * 60);
+            return minutes >= 5 && minutes <= 1440; // 5 minutes to 1 day
+        }, "Voting duration must be between 5 minutes and 1 day (1440 minutes)"),
 });
 
 export function CreateProposalDialog() {
@@ -49,26 +48,25 @@ export function CreateProposalDialog() {
         defaultValues: {
             title: "",
             description: "",
-            endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days from now
+            endDate: new Date(Date.now() + 10 * 60 * 1000), // Default to 10 minutes from now
         },
     });
 
     async function onSubmit(values: z.infer<typeof formSchema>) {
         try {
-            // Calculate duration in days
-            const durationDays = Math.ceil(
-                (values.endDate.getTime() - Date.now()) / (24 * 60 * 60 * 1000)
+            // Calculate duration in minutes
+            const durationMinutes = Math.ceil(
+                (values.endDate.getTime() - Date.now()) / (1000 * 60)
             );
 
             // Call the createProposal function
-            await createProposal(values.title, values.description, durationDays.toString());
+            await createProposal(values.title, values.description, durationMinutes.toString());
 
             // Close the dialog and reset the form
             setOpen(false);
             form.reset();
         } catch (err) {
-            // Errors are already handled in the hook, so no need to display them here
-            console.error("Failed to create proposal:", err);
+            console.error("Error creating proposal:", err);
         }
     }
 
@@ -131,55 +129,56 @@ export function CreateProposalDialog() {
                             name="endDate"
                             render={({ field }) => (
                                 <FormItem className="space-y-4">
-                                    <FormLabel>Voting Duration (Days)</FormLabel>
+                                    <FormLabel>Voting Duration (Minutes)</FormLabel>
                                     <FormControl>
                                         <Input
                                             type="number"
-                                            min={1}
-                                            max={30}
+                                            min={5} // Minimum 5 minutes
+                                            max={1440} // Maximum 1 day (1440 minutes)
                                             {...field}
                                             onChange={(e) => {
-                                                const days = Math.min(
-                                                    30,
+                                                const minutes = Math.min(
+                                                    1440,
                                                     Math.max(
-                                                        1,
-                                                        Number.parseInt(e.target.value) || 1
+                                                        5,
+                                                        Number.parseInt(e.target.value) || 5
                                                     )
                                                 );
                                                 field.onChange(
-                                                    new Date(
-                                                        Date.now() + days * 24 * 60 * 60 * 1000
-                                                    )
+                                                    new Date(Date.now() + minutes * 60 * 1000)
                                                 );
                                             }}
                                             value={Math.ceil(
-                                                (field.value.getTime() - Date.now()) /
-                                                    (24 * 60 * 60 * 1000)
+                                                (field.value.getTime() - Date.now()) / (60 * 1000)
                                             )}
                                         />
                                     </FormControl>
                                     <div className="flex gap-2">
-                                        {[3, 5, 7, 10].map((days) => (
+                                        {[5, 60, 360, 1440].map((minutes) => (
                                             <Button
-                                                key={days}
+                                                key={minutes}
                                                 type="button"
                                                 variant="outline"
                                                 size="sm"
                                                 onClick={() =>
                                                     field.onChange(
-                                                        new Date(
-                                                            Date.now() + days * 24 * 60 * 60 * 1000
-                                                        )
+                                                        new Date(Date.now() + minutes * 60 * 1000)
                                                     )
                                                 }
                                             >
-                                                {days}d
+                                                {minutes === 5
+                                                    ? "5 min"
+                                                    : minutes === 60
+                                                    ? "1 hr"
+                                                    : minutes === 360
+                                                    ? "6 hrs"
+                                                    : "1 day"}
                                             </Button>
                                         ))}
                                     </div>
                                     <FormDescription>
-                                        Select the number of days the proposal will be open for
-                                        voting (max 30 days)
+                                        Select the number of minutes the proposal will be open for
+                                        voting (5 minutes to 1 day)
                                     </FormDescription>
                                     <FormMessage />
                                 </FormItem>
