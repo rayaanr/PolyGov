@@ -13,15 +13,29 @@ export function formatDate(date: number): string {
     return new Date(date * 1000).toLocaleString();
 }
 
+const STATUS_MAP: Record<number, string> = {
+    0: "Active",
+    1: "Accepted",
+    2: "Rejected",
+} as const;
+
+type StatusValue = keyof typeof STATUS_MAP;
+
 export function getStatusText(status: number): string {
-    switch (status) {
-        case 0:
-            return "Active";
-        case 1:
-            return "Accepted";
-        case 2:
-            return "Rejected";
-        default:
-            return `Unknown Status (${status})`;
-    }
+    return STATUS_MAP[status as StatusValue] ?? `Unknown Status (${status})`;
 }
+
+// Utility function (should be moved to utils file)
+const BADGE_VARIANTS = {
+    Active: "default",
+    Rejected: "destructive",
+    Accepted: "outline",
+} as const;
+
+// Type for badge variants
+type BadgeVariant = (typeof BADGE_VARIANTS)[keyof typeof BADGE_VARIANTS] | "secondary";
+
+export const getBadgeVariant = (status: number): BadgeVariant => {
+    const statusText = getStatusText(status);
+    return BADGE_VARIANTS[statusText as keyof typeof BADGE_VARIANTS] ?? "secondary";
+};

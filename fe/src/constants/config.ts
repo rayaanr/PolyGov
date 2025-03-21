@@ -13,6 +13,7 @@ interface ChainConfig {
     abi: {
         governance: Abi;
     };
+    icon: string;
 }
 
 const CONFIG: {
@@ -29,7 +30,8 @@ const CONFIG: {
         },
         abi: {
             governance: mainABI as Abi,
-        }
+        },
+        icon: "/bsc.png",
     },
     SECONDARY_CHAINS: [
         {
@@ -42,7 +44,8 @@ const CONFIG: {
             },
             abi: {
                 governance: arbABI as Abi,
-            }
+            },
+            icon: "/arb.png",
         },
     ],
 } as const;

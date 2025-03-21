@@ -1,3 +1,5 @@
+import { MAIN_CONFIG } from "@/constants/config";
+
 export type Chain = "ethereum" | "polygon" | "arbitrum" | "optimism";
 
 export type ProposalStatus = "active" | "passed" | "failed" | "pending";
@@ -50,3 +52,19 @@ export interface ProposalDetails {
     finalNoVotes: bigint;
     voteTallyFinalized: boolean;
 }
+
+// Types
+export type ChainConfig = typeof MAIN_CONFIG;
+export type ProposalId = string;
+
+export interface SecondaryProposal {
+    chainName: string;
+    proposal: ProposalDetails;
+}
+
+export interface CombinedProposal {
+    id: ProposalId;
+    mainProposal: ProposalDetails;
+    secondaryProposals: SecondaryProposal[];
+}
+

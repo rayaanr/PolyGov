@@ -3,18 +3,11 @@
 import { useState } from "react";
 import { Separator } from "@/components/ui/separator";
 import { ProposalList } from "./proposal-list";
-import { mockProposals, mockStats } from "@/lib/mock-data";
-import type { Chain } from "@/lib/types";
+import { mockStats } from "@/lib/mock-data";
 import { StatsGrid } from "./stats-grid";
 import { CreateProposalDialog } from "./create-proposal-dialog";
 
 export default function Dashboard() {
-    const [selectedChain, setSelectedChain] = useState<Chain | "all">("all");
-
-    const filteredProposals =
-        selectedChain === "all"
-            ? mockProposals
-            : mockProposals.filter((p) => p.votesPerChain.some((v) => v.chain === selectedChain));
 
     return (
         <div className="container mx-auto p-4 space-y-6 mb-44">
@@ -39,7 +32,7 @@ export default function Dashboard() {
                     </div>
                     <CreateProposalDialog />
                 </div>
-                <ProposalList proposals={filteredProposals} />
+                <ProposalList />
             </div>
         </div>
     );
