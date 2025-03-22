@@ -8,12 +8,11 @@ import { StatsGrid } from "./stats-grid";
 import { CreateProposalDialog } from "./create-proposal-dialog";
 
 export default function Dashboard() {
-
     return (
-        <div className="container mx-auto p-4 space-y-6 mb-44">
-            <div className="flex flex-col space-y-2">
-                <h1 className="text-4xl font-bold">Cross-Chain Governance</h1>
-                <p className="text-muted-foreground">
+        <div className="container mx-auto p-4 space-y-8">
+            <div className="flex flex-col space-y-2 mt-4">
+                <h1 className="text-3xl font-medium">Cross-Chain Governance</h1>
+                <p className="text-sm text-muted-foreground">
                     Manage and vote on proposals across multiple chains
                 </p>
             </div>
@@ -25,8 +24,8 @@ export default function Dashboard() {
             <div className="space-y-4">
                 <div className="flex items-center justify-between">
                     <div>
-                        <h2 className="text-2xl font-semibold">Active Proposals</h2>
-                        <p className="text-sm text-muted-foreground">
+                        <h2 className="text-xl font-medium">Active Proposals</h2>
+                        <p className="text-xs text-muted-foreground mt-1">
                             Current governance proposals across all chains
                         </p>
                     </div>

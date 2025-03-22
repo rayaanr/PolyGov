@@ -29,7 +29,7 @@ export function getStatusText(status: number): string {
 const BADGE_VARIANTS = {
     Active: "default",
     Rejected: "destructive",
-    Accepted: "outline",
+    Accepted: "success",
 } as const;
 
 // Type for badge variants

@@ -20,7 +20,7 @@ interface ChainVoteSectionProps {
 
 export function ChainVoteSection({ proposal }: ChainVoteSectionProps) {
     const [selectedChain, setSelectedChain] = useState<Chain>("ethereum");
-    const [voteType, setVoteType] = useState<"for" | "against" | "abstain" | null>(null);
+    const [voteType, setVoteType] = useState<"for" | "against" | null>(null);
 
     return (
         <Card>
@@ -31,7 +31,7 @@ export function ChainVoteSection({ proposal }: ChainVoteSectionProps) {
                 </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-                {/* <div>
+                <div>
                     <label className="text-sm font-medium mb-2 block">Select Chain</label>
                     <Select
                         value={selectedChain}
@@ -54,7 +54,7 @@ export function ChainVoteSection({ proposal }: ChainVoteSectionProps) {
                             ))}
                         </SelectContent>
                     </Select>
-                </div> */}
+                </div>
 
                 <div className="space-y-2">
                     <label className="text-sm font-medium block">Your Vote</label>
@@ -73,13 +73,6 @@ export function ChainVoteSection({ proposal }: ChainVoteSectionProps) {
                         >
                             Against
                         </Button>
-                        {/* <Button
-                            variant={voteType === "abstain" ? "default" : "outline"}
-                            onClick={() => setVoteType("abstain")}
-                            className="w-full"
-                        >
-                            Abstain
-                        </Button> */}
                     </div>
                 </div>
 
@@ -104,23 +97,17 @@ export function ChainVoteSection({ proposal }: ChainVoteSectionProps) {
                                 />
                                 <span className="text-sm font-medium">{chainVote.chain}</span>
                                 <span className="text-sm text-muted-foreground ml-auto">
-                                    {(
-                                        chainVote.forVotes +
-                                        chainVote.againstVotes +
-                                        chainVote.abstainVotes
-                                    ).toLocaleString()}{" "}
+                                    {(chainVote.forVotes + chainVote.againstVotes).toLocaleString()}{" "}
                                     votes
                                 </span>
                             </div>
-                            <div className="grid grid-cols-3 gap-2">
+                            <div className="grid grid-cols-2 gap-2">
                                 <div className="space-y-1">
                                     <div className="text-xs">For</div>
                                     <Progress
                                         value={
                                             (chainVote.forVotes /
-                                                (chainVote.forVotes +
-                                                    chainVote.againstVotes +
-                                                    chainVote.abstainVotes)) *
+                                                (chainVote.forVotes + chainVote.againstVotes)) *
                                             100
                                         }
                                     />
@@ -130,21 +117,7 @@ export function ChainVoteSection({ proposal }: ChainVoteSectionProps) {
                                     <Progress
                                         value={
                                             (chainVote.againstVotes /
-                                                (chainVote.forVotes +
-                                                    chainVote.againstVotes +
-                                                    chainVote.abstainVotes)) *
-                                            100
-                                        }
-                                    />
-                                </div>
-                                <div className="space-y-1">
-                                    <div className="text-xs">Abstain</div>
-                                    <Progress
-                                        value={
-                                            (chainVote.abstainVotes /
-                                                (chainVote.forVotes +
-                                                    chainVote.againstVotes +
-                                                    chainVote.abstainVotes)) *
+                                                (chainVote.forVotes + chainVote.againstVotes)) *
                                             100
                                         }
                                     />
