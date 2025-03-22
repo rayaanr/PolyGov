@@ -1,5 +1,6 @@
 import { mainABI } from "@/constants/abi/main";
 import { arbABI } from "@/constants/abi/secondary";
+import { bscTestnet, arbitrumSepolia } from "wagmi/chains";
 import { Abi } from "viem";
 
 interface ChainConfig {
@@ -21,9 +22,9 @@ const CONFIG: {
     SECONDARY_CHAINS: ChainConfig[];
 } = {
     MAIN: {
-        name: "BSC Testnet",
-        chainId: 97,
-        explorerUrl: "https://testnet.bscscan.com",
+        name: bscTestnet.name,
+        chainId: bscTestnet.id,
+        explorerUrl: bscTestnet.blockExplorers?.default.url,
         contracts: {
             token: "0x22f17c601b36bb193aca3585F14a6345A979219d",
             governance: "0x4F90cb1474bF846682B267e62cEA52505477B378",
@@ -35,9 +36,9 @@ const CONFIG: {
     },
     SECONDARY_CHAINS: [
         {
-            name: "Arbitrum Sepolia",
-            chainId: 421614,
-            explorerUrl: "https://sepolia.arbiscan.io/",
+            name: arbitrumSepolia.name,
+            chainId: arbitrumSepolia.id,
+            explorerUrl: arbitrumSepolia.blockExplorers?.default.url,
             contracts: {
                 token: "0x4F90cb1474bF846682B267e62cEA52505477B378",
                 governance: "0x82ACdE34e54B408E808a8f625648ED4eCe7A745e",

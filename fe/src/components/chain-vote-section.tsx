@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import {
     Select,
     SelectContent,
@@ -11,16 +11,32 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { Progress } from "@/components/ui/progress";
-import type { Chain, Proposal } from "@/lib/types";
-import { chainColors } from "@/lib/mock-data";
+import type { CombinedProposal } from "@/lib/types";
+import { MAIN_CONFIG } from "@/constants/config";
+import { useVoteOnProposal } from "@/hooks/useVoteOnProposal";
+
+// Constants
+const TOTAL_TOKENS_PER_CHAIN = BigInt(10000 * 10 ** 18); // 10,000 tokens in 10^18 format
+const PENDING_STATUS = 0;
 
 interface ChainVoteSectionProps {
-    proposal: Proposal;
+    proposal: CombinedProposal;
+    id: string;
 }
 
-export function ChainVoteSection({ proposal }: ChainVoteSectionProps) {
-    const [selectedChain, setSelectedChain] = useState<Chain>("ethereum");
-    const [voteType, setVoteType] = useState<"for" | "against" | null>(null);
+export function ChainVoteSection({ proposal, id }: ChainVoteSectionProps) {
+    const [selectedChain, setSelectedChain] = useState<string>(
+        proposal.secondaryProposals[0]?.chainName || "main"
+    );
+    const [voteType, setVoteType] = useState<boolean | null>(null);
+
+    const { voteOnProposal, isPending } = useVoteOnProposal();
+
+    // Format token amount from BigInt to readable number
+    const formatTokenAmount = (amount: bigint) => (Number(amount) / 10 ** 18).toLocaleString();
+
+    // Check if voting is active based on status
+    const isVotingActive = proposal.mainProposal.status === PENDING_STATUS;
 
     return (
         <Card>
@@ -31,24 +47,25 @@ export function ChainVoteSection({ proposal }: ChainVoteSectionProps) {
                 </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
+                {/* Chain Selection */}
                 <div>
                     <label className="text-sm font-medium mb-2 block">Select Chain</label>
-                    <Select
-                        value={selectedChain}
-                        onValueChange={(value) => setSelectedChain(value as Chain)}
-                    >
+                    <Select value={selectedChain} onValueChange={setSelectedChain}>
                         <SelectTrigger className="w-[200px]">
                             <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                            {Object.keys(chainColors).map((chain) => (
-                                <SelectItem key={chain} value={chain}>
+                            <SelectItem value="main">
+                                <div className="flex items-center gap-2">
+                                    <div className="w-2 h-2 rounded-full" />
+                                    <span>{MAIN_CONFIG.name}</span>
+                                </div>
+                            </SelectItem>
+                            {proposal.secondaryProposals.map((sp) => (
+                                <SelectItem key={sp.chainName} value={sp.chainName}>
                                     <div className="flex items-center gap-2">
-                                        <div
-                                            className="w-2 h-2 rounded-full"
-                                            style={{ backgroundColor: chainColors[chain as Chain] }}
-                                        />
-                                        <span>{chain}</span>
+                                        <div className="w-2 h-2 rounded-full" />
+                                        <span>{sp.chainName}</span>
                                     </div>
                                 </SelectItem>
                             ))}
@@ -56,19 +73,20 @@ export function ChainVoteSection({ proposal }: ChainVoteSectionProps) {
                     </Select>
                 </div>
 
+                {/* Vote Selection */}
                 <div className="space-y-2">
                     <label className="text-sm font-medium block">Your Vote</label>
                     <div className="grid grid-cols-2 gap-4">
                         <Button
-                            variant={voteType === "for" ? "default" : "outline"}
-                            onClick={() => setVoteType("for")}
+                            variant={voteType === true ? "success" : "outline"}
+                            onClick={() => setVoteType(true)}
                             className="w-full"
                         >
                             For
                         </Button>
                         <Button
-                            variant={voteType === "against" ? "default" : "outline"}
-                            onClick={() => setVoteType("against")}
+                            variant={voteType === false ? "destructive" : "outline"}
+                            onClick={() => setVoteType(false)}
                             className="w-full"
                         >
                             Against
@@ -76,57 +94,88 @@ export function ChainVoteSection({ proposal }: ChainVoteSectionProps) {
                     </div>
                 </div>
 
+                {/* Voting Power and Submit */}
                 <div className="space-y-2">
                     <div className="flex justify-between text-sm">
                         <span>Voting Power</span>
-                        <span>1,000 votes</span>
+                        <span>{formatTokenAmount(BigInt(1000 * 10 ** 18))} tokens</span>
                     </div>
-                    <Button className="w-full" disabled={!voteType || proposal.status !== "active"}>
+                    <Button
+                        className="w-full"
+                        disabled={!isVotingActive || voteType === null || isPending}
+                        onClick={() => {
+                            if (voteType !== null) {
+                                voteOnProposal(id, voteType);
+                            }
+                        }}
+                    >
                         Submit Vote
                     </Button>
                 </div>
 
+                {/* Vote Breakdown for All Chains */}
                 <div className="space-y-4">
-                    <h4 className="text-sm font-medium">Votes by Chain</h4>
-                    {proposal.votesPerChain.map((chainVote) => (
-                        <div key={chainVote.chain} className="space-y-2">
-                            <div className="flex items-center gap-2">
-                                <div
-                                    className="w-2 h-2 rounded-full"
-                                    style={{ backgroundColor: chainColors[chainVote.chain] }}
-                                />
-                                <span className="text-sm font-medium">{chainVote.chain}</span>
-                                <span className="text-sm text-muted-foreground ml-auto">
-                                    {(chainVote.forVotes + chainVote.againstVotes).toLocaleString()}{" "}
-                                    votes
-                                </span>
-                            </div>
-                            <div className="grid grid-cols-2 gap-2">
-                                <div className="space-y-1">
-                                    <div className="text-xs">For</div>
-                                    <Progress
-                                        value={
-                                            (chainVote.forVotes /
-                                                (chainVote.forVotes + chainVote.againstVotes)) *
-                                            100
-                                        }
-                                    />
-                                </div>
-                                <div className="space-y-1">
-                                    <div className="text-xs">Against</div>
-                                    <Progress
-                                        value={
-                                            (chainVote.againstVotes /
-                                                (chainVote.forVotes + chainVote.againstVotes)) *
-                                            100
-                                        }
-                                    />
-                                </div>
-                            </div>
-                        </div>
+                    <h4 className="text-sm font-medium">Vote Breakdown by Chain</h4>
+
+                    {/* Main Proposal Votes */}
+                    <VoteBreakdown
+                        chainName={`${MAIN_CONFIG.name} (Main)`}
+                        yesVotes={BigInt(proposal.mainProposal.yesVotes)}
+                        noVotes={BigInt(proposal.mainProposal.noVotes)}
+                        formatTokenAmount={formatTokenAmount}
+                    />
+
+                    {/* Secondary Proposals Votes */}
+                    {proposal.secondaryProposals.map((sp) => (
+                        <VoteBreakdown
+                            key={sp.chainName}
+                            chainName={sp.chainName}
+                            yesVotes={BigInt(sp.proposal.yesVotes)}
+                            noVotes={BigInt(sp.proposal.noVotes)}
+                            formatTokenAmount={formatTokenAmount}
+                        />
                     ))}
                 </div>
             </CardContent>
         </Card>
+    );
+}
+
+// Extracted component for vote breakdown to reduce repetition
+function VoteBreakdown({
+    chainName,
+    yesVotes,
+    noVotes,
+    formatTokenAmount,
+}: {
+    chainName: string;
+    yesVotes: bigint;
+    noVotes: bigint;
+    formatTokenAmount: (amount: bigint) => string;
+}) {
+    const total = yesVotes + noVotes;
+    const yesPercentage = Number((yesVotes * BigInt(100)) / TOTAL_TOKENS_PER_CHAIN);
+    const noPercentage = Number((noVotes * BigInt(100)) / TOTAL_TOKENS_PER_CHAIN);
+
+    return (
+        <div className="space-y-2">
+            <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full" />
+                <span className="text-sm font-medium">{chainName}</span>
+                <span className="text-sm text-muted-foreground ml-auto">
+                    {formatTokenAmount(total)} tokens
+                </span>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                    <div className="text-xs">For ({formatTokenAmount(yesVotes)})</div>
+                    <Progress value={yesPercentage} className="h-1" />
+                </div>
+                <div className="space-y-1">
+                    <div className="text-xs">Against ({formatTokenAmount(noVotes)})</div>
+                    <Progress value={noPercentage} className="h-1" />
+                </div>
+            </div>
+        </div>
     );
 }
