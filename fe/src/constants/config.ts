@@ -1,5 +1,5 @@
 import { mainABI } from "@/constants/abi/main";
-import { arbABI } from "@/constants/abi/arb";
+import { arbABI } from "@/constants/abi/secondary";
 import { Abi } from "viem";
 
 interface ChainConfig {
