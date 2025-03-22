@@ -38,7 +38,13 @@ export interface GovernanceStats {
 
 
 //---------------------
+enum ProposalStatusEnum {
+    Pending = 0,
+    Accepted = 1,
+    Rejected = 2,
+}
 
+// Main proposal details
 export interface ProposalDetails {
     proposalId: string;
     title: string;
@@ -47,24 +53,38 @@ export interface ProposalDetails {
     noVotes: bigint;
     startTime: bigint;
     endTime: bigint;
-    status: number;
+    status: ProposalStatusEnum;
     finalYesVotes: bigint;
     finalNoVotes: bigint;
     voteTallyFinalized: boolean;
+}
+
+// Secondary proposal details
+export interface SecondaryProposalDetails {
+    proposalId: string;
+    title: string;
+    description: string;
+    yesVotes: bigint;
+    noVotes: bigint;
+    startTime: bigint;
+    endTime: bigint;
+    status: ProposalStatusEnum;
+    voteTallied: boolean;
 }
 
 // Types
 export type ChainConfig = typeof MAIN_CONFIG;
 export type ProposalId = string;
 
+// Secondary proposal wrapper
 export interface SecondaryProposal {
     chainName: string;
-    proposal: ProposalDetails;
+    proposal: SecondaryProposalDetails;
 }
 
+// Combined proposal structure
 export interface CombinedProposal {
     id: ProposalId;
     mainProposal: ProposalDetails;
     secondaryProposals: SecondaryProposal[];
 }
-
