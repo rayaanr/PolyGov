@@ -30,5 +30,4 @@ const useVoteStats = (
     };
 };
 
-
 export default useVoteStats;

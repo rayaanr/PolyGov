@@ -36,7 +36,6 @@ export interface GovernanceStats {
     averageParticipation: number;
 }
 
-
 //---------------------
 enum ProposalStatusEnum {
     Pending = 0,

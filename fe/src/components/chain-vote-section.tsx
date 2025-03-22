@@ -14,6 +14,8 @@ import { Progress } from "@/components/ui/progress";
 import type { CombinedProposal } from "@/lib/types";
 import { MAIN_CONFIG } from "@/constants/config";
 import { useVoteOnProposal } from "@/hooks/useVoteOnProposal";
+import { Skeleton } from "./ui/skeleton";
+import { useVotingPower } from "@/hooks/useVotingPower";
 
 // Constants
 const TOTAL_TOKENS_PER_CHAIN = BigInt(10000 * 10 ** 18); // 10,000 tokens in 10^18 format
@@ -31,6 +33,11 @@ export function ChainVoteSection({ proposal, id }: ChainVoteSectionProps) {
     const [voteType, setVoteType] = useState<boolean | null>(null);
 
     const { voteOnProposal, isPending } = useVoteOnProposal();
+    const {
+        votingPower,
+        isLoading: isLoadingVotingPower,
+        error: votingPowerError,
+    } = useVotingPower(id);
 
     // Format token amount from BigInt to readable number
     const formatTokenAmount = (amount: bigint) => (Number(amount) / 10 ** 18).toLocaleString();
@@ -98,7 +105,11 @@ export function ChainVoteSection({ proposal, id }: ChainVoteSectionProps) {
                 <div className="space-y-2">
                     <div className="flex justify-between text-sm">
                         <span>Voting Power</span>
-                        <span>{formatTokenAmount(BigInt(1000 * 10 ** 18))} tokens</span>
+                        {isLoadingVotingPower ? (
+                            <Skeleton className="w-24 h-3" />
+                        ) : (
+                            <span>{formatTokenAmount(votingPower ?? BigInt(0))} tokens</span>
+                        )}
                     </div>
                     <Button
                         className="w-full"
