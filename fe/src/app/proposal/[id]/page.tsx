@@ -1,3 +1,6 @@
+"use client";
+
+import { useState, useEffect } from "react";
 import { notFound } from "next/navigation";
 import { ChainVoteSection } from "@/components/chain-vote-section";
 import { mockProposals } from "@/lib/mock-data";
@@ -6,15 +9,31 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Progress } from "@/components/ui/progress";
 import { CalendarIcon, Clock } from "lucide-react";
 import { format } from "date-fns";
+import { ProposalDetailSkeleton } from "@/components/proposal-detail-skeleton";
 
 export default function ProposalPage({ params }: { params: { id: string } }) {
+    const [loading, setLoading] = useState(true);
+
     const proposal = mockProposals.find((p) => p.id === params.id);
+
+    useEffect(() => {
+        // Simulate loading for 5 seconds
+        const timer = setTimeout(() => {
+            setLoading(false);
+        }, 5000);
+
+        return () => clearTimeout(timer);
+    }, []);
 
     if (!proposal) {
         notFound();
     }
 
     const totalVotes = proposal.totalVotes.for + proposal.totalVotes.against;
+
+    if (loading) {
+        return <ProposalDetailSkeleton />;
+    }
 
     return (
         <div className="container max-w-3xl mx-auto p-4 space-y-6">
@@ -41,7 +60,7 @@ export default function ProposalPage({ params }: { params: { id: string } }) {
                         proposal.status === "active"
                             ? "default"
                             : proposal.status === "passed"
-                            ? "default"
+                            ? "success"
                             : proposal.status === "failed"
                             ? "destructive"
                             : "secondary"
