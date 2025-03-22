@@ -9,7 +9,6 @@ export function useHasUserVoted(proposalId: string) {
 
     // Input validation
     if (!proposalId) throw new Error("Proposal ID required");
-    if (!address) throw new Error("Wallet not connected");
 
     // Get chain configuration
     const config =

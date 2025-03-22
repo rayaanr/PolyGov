@@ -8,7 +8,6 @@ export function useVotingPower(proposalId: string) {
     const { address } = useAccount();
 
     if (!proposalId) throw new Error("Proposal ID required");
-    if (!address) throw new Error("Wallet not connected");
 
     const config =
         SUPPORTED_CHAINS[chainId] ??
@@ -20,7 +19,7 @@ export function useVotingPower(proposalId: string) {
         address: config.config.contracts.governance as Address,
         abi: config.config.abi.governance,
         functionName: USER_VOTE_POWER_KEY,
-        args: [proposalId, address],
+        args: address ? [proposalId, address] : undefined,
         chainId: config.chain.id,
     });
 

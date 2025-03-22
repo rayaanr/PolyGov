@@ -11,11 +11,13 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { Progress } from "@/components/ui/progress";
+import { useAccount } from "wagmi";
 import type { CombinedProposal } from "@/lib/types";
 import { MAIN_CONFIG } from "@/constants/config";
 import { useVoteOnProposal } from "@/hooks/useVoteOnProposal";
 import { Skeleton } from "./ui/skeleton";
 import { useVotingPower } from "@/hooks/useVotingPower";
+import { useHasUserVoted } from "@/hooks/useHasUserVoted";
 
 // Constants
 const TOTAL_TOKENS_PER_CHAIN = BigInt(10000 * 10 ** 18); // 10,000 tokens in 10^18 format
@@ -32,7 +34,9 @@ export function ChainVoteSection({ proposal, id }: ChainVoteSectionProps) {
     );
     const [voteType, setVoteType] = useState<boolean | null>(null);
 
+    const { isConnected } = useAccount();
     const { voteOnProposal, isPending } = useVoteOnProposal();
+    const { hasVoted, isLoading: isLoadingHasVoted } = useHasUserVoted(id);
     const {
         votingPower,
         isLoading: isLoadingVotingPower,
@@ -45,6 +49,13 @@ export function ChainVoteSection({ proposal, id }: ChainVoteSectionProps) {
     // Check if voting is active based on status
     const isVotingActive = proposal.mainProposal.status === PENDING_STATUS;
 
+    // Handle vote submission
+    const handleVote = () => {
+        if (voteType !== null && isConnected && !hasVoted) {
+            voteOnProposal(id, voteType);
+        }
+    };
+
     return (
         <Card>
             <CardHeader>
@@ -54,89 +65,111 @@ export function ChainVoteSection({ proposal, id }: ChainVoteSectionProps) {
                 </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-                {/* Chain Selection */}
-                <div>
-                    <label className="text-sm font-medium mb-2 block">Select Chain</label>
-                    <Select value={selectedChain} onValueChange={setSelectedChain}>
-                        <SelectTrigger className="w-[200px]">
-                            <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="main">
-                                <div className="flex items-center gap-2">
-                                    <div className="w-2 h-2 rounded-full" />
-                                    <span>{MAIN_CONFIG.name}</span>
-                                </div>
-                            </SelectItem>
-                            {proposal.secondaryProposals.map((sp) => (
-                                <SelectItem key={sp.chainName} value={sp.chainName}>
-                                    <div className="flex items-center gap-2">
-                                        <div className="w-2 h-2 rounded-full" />
-                                        <span>{sp.chainName}</span>
-                                    </div>
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                </div>
-
-                {/* Vote Selection */}
-                <div className="space-y-2">
-                    <label className="text-sm font-medium block">Your Vote</label>
-                    <div className="grid grid-cols-2 gap-4">
-                        <Button
-                            variant={voteType === true ? "success" : "outline"}
-                            onClick={() => setVoteType(true)}
-                            className="w-full"
-                        >
-                            For
-                        </Button>
-                        <Button
-                            variant={voteType === false ? "destructive" : "outline"}
-                            onClick={() => setVoteType(false)}
-                            className="w-full"
-                        >
-                            Against
-                        </Button>
+                {/* Wallet Connection Status */}
+                {!isConnected ? (
+                    <div className="text-center space-y-4">
+                        <p className="text-sm text-yellow-500">
+                            You are not connected to a wallet. Please connect your wallet to vote.
+                        </p>
                     </div>
-                </div>
-
-                {/* Voting Power and Submit */}
-                <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                        <span>Voting Power</span>
-                        {isLoadingVotingPower ? (
-                            <Skeleton className="w-24 h-3" />
-                        ) : (
-                            <span>{formatTokenAmount(votingPower ?? BigInt(0))} tokens</span>
-                        )}
+                ) : isLoadingHasVoted ? (
+                    <Skeleton className="w-full h-20" />
+                ) : hasVoted ? (
+                    <div className="text-center space-y-4">
+                        <p className="text-sm text-muted-foreground">
+                            You have already voted on this proposal.
+                        </p>
                     </div>
-                    <Button
-                        className="w-full"
-                        disabled={!isVotingActive || voteType === null || isPending}
-                        onClick={() => {
-                            if (voteType !== null) {
-                                voteOnProposal(id, voteType);
-                            }
-                        }}
-                    >
-                        Submit Vote
-                    </Button>
-                </div>
+                ) : (
+                    <>
+                        {/* Chain Selection */}
+                        <div>
+                            <label className="text-sm font-medium mb-2 block">Select Chain</label>
+                            <Select value={selectedChain} onValueChange={setSelectedChain}>
+                                <SelectTrigger className="w-[200px]">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="main">
+                                        <div className="flex items-center gap-2">
+                                            <div className="w-2 h-2 rounded-full bg-primary" />
+                                            <span>{MAIN_CONFIG.name}</span>
+                                        </div>
+                                    </SelectItem>
+                                    {proposal.secondaryProposals.map((sp) => (
+                                        <SelectItem key={sp.chainName} value={sp.chainName}>
+                                            <div className="flex items-center gap-2">
+                                                <div className="w-2 h-2 rounded-full bg-primary" />
+                                                <span>{sp.chainName}</span>
+                                            </div>
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        {/* Vote Selection */}
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium block">Your Vote</label>
+                            <div className="grid grid-cols-2 gap-4">
+                                <Button
+                                    variant={voteType === true ? "success" : "outline"}
+                                    onClick={() => setVoteType(true)}
+                                    className="w-full"
+                                    disabled={!isVotingActive}
+                                >
+                                    For
+                                </Button>
+                                <Button
+                                    variant={voteType === false ? "destructive" : "outline"}
+                                    onClick={() => setVoteType(false)}
+                                    className="w-full"
+                                    disabled={!isVotingActive}
+                                >
+                                    Against
+                                </Button>
+                            </div>
+                        </div>
+
+                        {/* Voting Power and Submit */}
+                        <div className="space-y-2">
+                            <div className="flex justify-between text-sm">
+                                <span>Voting Power</span>
+                                {isLoadingVotingPower ? (
+                                    <Skeleton className="w-24 h-3" />
+                                ) : votingPowerError ? (
+                                    <span className="text-destructive">Error loading power</span>
+                                ) : (
+                                    <span>
+                                        {formatTokenAmount(votingPower ?? BigInt(0))} tokens
+                                    </span>
+                                )}
+                            </div>
+                            <Button
+                                className="w-full"
+                                disabled={
+                                    !isVotingActive ||
+                                    voteType === null ||
+                                    isPending ||
+                                    votingPower === BigInt(0)
+                                }
+                                onClick={handleVote}
+                            >
+                                {isPending ? "Submitting..." : "Submit Vote"}
+                            </Button>
+                        </div>
+                    </>
+                )}
 
                 {/* Vote Breakdown for All Chains */}
                 <div className="space-y-4">
                     <h4 className="text-sm font-medium">Vote Breakdown by Chain</h4>
-
-                    {/* Main Proposal Votes */}
                     <VoteBreakdown
                         chainName={`${MAIN_CONFIG.name} (Main)`}
                         yesVotes={BigInt(proposal.mainProposal.yesVotes)}
                         noVotes={BigInt(proposal.mainProposal.noVotes)}
                         formatTokenAmount={formatTokenAmount}
                     />
-
-                    {/* Secondary Proposals Votes */}
                     {proposal.secondaryProposals.map((sp) => (
                         <VoteBreakdown
                             key={sp.chainName}
