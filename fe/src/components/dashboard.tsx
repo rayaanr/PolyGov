@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import { Separator } from "@/components/ui/separator";
 import { ProposalList } from "./proposal-list";
 import { mockStats } from "@/lib/mock-data";
