@@ -166,6 +166,97 @@ function setupMainChainEventListeners(
     });
 }
 
+async function checkAndCollectVotes(
+    mainContract: ethers.Contract,
+    chainId: string,
+    proposalId: string,
+    yesVotes: bigint,
+    noVotes: bigint
+): Promise<boolean> {
+    try {
+        const secondaryVotes = await mainContract.secondaryChainVotes(proposalId, chainId);
+        if (secondaryVotes.collected) {
+            console.log(`ℹ️ Votes already collected from ${chainId} for proposal ${proposalId}`);
+            return true;
+        }
+    } catch (err: any) {
+        if (err.reason?.toLowerCase().includes("votes already collected")) {
+            console.log(`ℹ️ Votes already collected from ${chainId} for proposal ${proposalId}`);
+            return true;
+        }
+    }
+
+    try {
+        const tx = await mainContract.collectSecondaryChainVotes(
+            proposalId,
+            chainId,
+            yesVotes,
+            noVotes
+        );
+        await tx.wait();
+        console.log(`✅ Collected votes from ${chainId} for proposal ${proposalId}`);
+        return true;
+    } catch (err: any) {
+        if (err.reason?.toLowerCase().includes("votes already collected")) {
+            console.log(`ℹ️ Votes already collected from ${chainId} for proposal ${proposalId}`);
+            return true;
+        }
+        throw err;
+    }
+}
+
+async function finalizeVotesIfPossible(
+    mainContract: ethers.Contract,
+    proposalId: string,
+    endTime: number,
+    cache: ProposalCache
+): Promise<void> {
+    const currentTime = Math.floor(Date.now() / 1000);
+    const cooldownEndTime = Number(endTime) + 3 * 60;
+
+    if (currentTime >= cooldownEndTime) {
+        try {
+            console.log(`🔢 Finalizing vote tally for proposal ${proposalId}`);
+            const finalizeTx = await mainContract.finalizeProposalVotes(proposalId);
+            await finalizeTx.wait();
+            console.log(`✅ Finalized vote tally for proposal ${proposalId}`);
+            markProposalAsFinalized(proposalId.toString(), cache);
+        } catch (error) {
+            console.error(`❌ Error finalizing proposal ${proposalId}:`, error);
+        }
+    }
+}
+
+async function mirrorAndFinalizeProposal(
+    contract: ethers.Contract,
+    proposalId: string,
+    proposal: any,
+    chainId: string,
+    isExpired: boolean
+): Promise<void> {
+    try {
+        const tx = await contract.mirrorProposal(
+            proposalId,
+            proposal.title,
+            proposal.description,
+            proposal.startTime,
+            proposal.endTime
+        );
+        await tx.wait();
+        console.log(`✅ Proposal ${proposalId} mirrored to ${chainId}`);
+
+        if (isExpired) {
+            const finalizeTx = await contract.finalizeVotes(proposalId);
+            await finalizeTx.wait();
+            console.log(
+                `✅ Votes finalized for newly mirrored expired proposal ${proposalId} on ${chainId}`
+            );
+        }
+    } catch (error) {
+        console.error(`❌ Error mirroring/finalizing proposal ${proposalId} on ${chainId}:`, error);
+    }
+}
+
 function setupSecondaryChainEventListeners(
     mainContract: ethers.Contract,
     secondaryConnections: Record<string, ContractConnections>
@@ -178,65 +269,21 @@ function setupSecondaryChainEventListeners(
                 `🗳️ Votes tallied for proposal ${proposalId} on ${chainId}: Yes=${yesVotes}, No=${noVotes}`
             );
             try {
-                // Check if votes are already collected
-                try {
-                    const secondaryVotes = await mainContract.secondaryChainVotes(
-                        proposalId,
-                        chainId
-                    );
-                    if (secondaryVotes.collected) {
-                        console.log(
-                            `ℹ️ Votes already collected from ${chainId} for proposal ${proposalId}`
-                        );
-                        return;
-                    }
-                } catch (err: any) {
-                    // Only proceed if the error is not about votes already being collected
-                    if (err.reason?.toLowerCase().includes("votes already collected")) {
-                        console.log(
-                            `ℹ️ Votes already collected from ${chainId} for proposal ${proposalId}`
-                        );
-                        return;
-                    }
-                }
-
-                // Collect votes
-                try {
-                    const tx = await mainContract.collectSecondaryChainVotes(
-                        proposalId,
-                        chainId,
-                        yesVotes,
-                        noVotes
-                    );
-                    await tx.wait();
-                    console.log(`✅ Collected votes from ${chainId} for proposal ${proposalId}`);
-                } catch (err: any) {
-                    if (err.reason?.toLowerCase().includes("votes already collected")) {
-                        console.log(
-                            `ℹ️ Votes already collected from ${chainId} for proposal ${proposalId}`
-                        );
-                        return;
-                    }
-                    throw err;
-                }
-
-                try {
+                if (
+                    await checkAndCollectVotes(mainContract, chainId, proposalId, yesVotes, noVotes)
+                ) {
                     const proposal = await mainContract.getProposalDetails(proposalId);
-                    const currentTime = Math.floor(Date.now() / 1000);
-                    const cooldownEndTime = Number(proposal.endTime) + 3 * 60;
-                    if (currentTime >= cooldownEndTime && !proposal.voteTallyFinalized) {
-                        console.log(
-                            `⏱️ Cooldown period ended for proposal ${proposalId}, finalizing votes`
+                    if (!proposal.voteTallyFinalized) {
+                        await finalizeVotesIfPossible(
+                            mainContract,
+                            proposalId,
+                            Number(proposal.endTime),
+                            loadProposalCache()
                         );
-                        const finalizeTx = await mainContract.finalizeProposalVotes(proposalId);
-                        await finalizeTx.wait();
-                        console.log(`✅ Finalized vote tally for proposal ${proposalId}`);
                     }
-                } catch (error) {
-                    console.error(`❌ Error checking proposal finalization status: ${error}`);
                 }
             } catch (error) {
-                console.error(`❌ Error collecting votes from ${chainId}:`, error);
+                console.error(`❌ Error processing votes for ${proposalId} on ${chainId}:`, error);
             }
         });
     }
@@ -295,40 +342,13 @@ async function syncExistingProposals(
                             console.log(
                                 `🔄 Mirroring missing proposal ${proposalId} to ${chainId}`
                             );
-                            try {
-                                const tx = await contract.mirrorProposal(
-                                    proposalId,
-                                    mainProposal.title,
-                                    mainProposal.description,
-                                    mainProposal.startTime,
-                                    mainProposal.endTime
-                                );
-                                await tx.wait();
-                                console.log(`✅ Proposal ${proposalId} mirrored to ${chainId}`);
-
-                                if (isExpired) {
-                                    console.log(
-                                        `⏳ Proposal ${proposalId} is expired, attempting to finalize on ${chainId}`
-                                    );
-                                    try {
-                                        const finalizeTx = await contract.finalizeVotes(proposalId);
-                                        await finalizeTx.wait();
-                                        console.log(
-                                            `✅ Expired proposal ${proposalId} votes finalized on ${chainId}`
-                                        );
-                                    } catch (error) {
-                                        console.error(
-                                            `❌ Failed to finalize expired proposal ${proposalId} on ${chainId}:`,
-                                            error
-                                        );
-                                    }
-                                }
-                            } catch (error) {
-                                console.error(
-                                    `❌ Error mirroring proposal ${proposalId} to ${chainId}:`,
-                                    error
-                                );
-                            }
+                            await mirrorAndFinalizeProposal(
+                                contract,
+                                proposalId,
+                                mainProposal,
+                                chainId,
+                                isExpired
+                            );
                         } else if (isExpired && !secondaryProposal.voteTallied) {
                             console.log(
                                 `⏳ Proposal ${proposalId} exists but not finalized on ${chainId}, finalizing`
@@ -459,20 +479,12 @@ async function processEndedProposals(
                             console.log(
                                 `⚠️ Proposal ${proposalId} missing on ${chainId}, mirroring`
                             );
-                            const tx = await contract.mirrorProposal(
+                            await mirrorAndFinalizeProposal(
+                                contract,
                                 proposalId,
-                                mainProposal.title,
-                                mainProposal.description,
-                                mainProposal.startTime,
-                                mainProposal.endTime
-                            );
-                            await tx.wait();
-                            console.log(`✅ Proposal ${proposalId} mirrored to ${chainId}`);
-
-                            const finalizeTx = await contract.finalizeVotes(proposalId);
-                            await finalizeTx.wait();
-                            console.log(
-                                `✅ Votes finalized for newly mirrored expired proposal ${proposalId} on ${chainId}`
+                                mainProposal,
+                                chainId,
+                                true
                             );
                             secondaryProposal = await contract.getProposalDetails(proposalId);
                         }
@@ -550,18 +562,12 @@ async function processEndedProposals(
                     }
                 }
 
-                const cooldownEndTime = Number(mainProposal.endTime) + 3 * 60;
-                if (currentTime >= cooldownEndTime && !mainProposal.voteTallyFinalized) {
-                    try {
-                        console.log(`🔢 Finalizing vote tally for proposal ${proposalId}`);
-                        const finalizeTx = await mainContract.finalizeProposalVotes(proposalId);
-                        await finalizeTx.wait();
-                        console.log(`✅ Finalized vote tally for proposal ${proposalId}`);
-                        markProposalAsFinalized(proposalId.toString(), cache);
-                    } catch (error) {
-                        console.error(`❌ Error finalizing proposal ${proposalId}:`, error);
-                    }
-                }
+                await finalizeVotesIfPossible(
+                    mainContract,
+                    proposalId,
+                    Number(mainProposal.endTime),
+                    cache
+                );
             } catch (error) {
                 console.error(`❌ Error processing proposal ${proposalId}:`, error);
             }
