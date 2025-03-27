@@ -5,26 +5,32 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Votes.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
-/**
- * @title MainGovernance
- * @dev Main governance contract that coordinates with secondary chains
- */
 contract MainGovernance is Ownable, ReentrancyGuard {
     ERC20Votes public governanceToken;
     address public relayer;
     bool public constant isMainChain = true;
     uint256 proposalNonce;
 
+    // Governance config
+    uint256 public requiredQuorumVotes;
+    uint256 public minVotingDurationMinutes;
+    uint256 public maxVotingDurationMinutes;
+
     enum ProposalStatus {
         Pending,
         Accepted,
-        Rejected
+        Rejected,
+        Executed
     }
 
     struct Proposal {
         bytes32 id;
+        address proposer;
         string title;
-        string description;
+        string ipfsCid;
+        address[] targets;
+        uint256[] values;
+        bytes[] calldatas;
         uint256 yesVotes;
         uint256 noVotes;
         uint256 startTime;
@@ -33,20 +39,8 @@ contract MainGovernance is Ownable, ReentrancyGuard {
         uint256 finalYesVotes;
         uint256 finalNoVotes;
         bool voteTallyFinalized;
+        bool executed;
     }
-
-    // Storage
-    mapping(bytes32 => Proposal) proposals;
-    mapping(bytes32 => mapping(address => bool)) hasVoted;
-    bytes32[] proposalIds;
-
-    // Secondary chain management
-    mapping(string => bool) registeredChains;
-    string[] chainList;
-
-    // Secondary chain votes tracking
-    // mapping(proposalId => mapping(chainId => VoteSummary))
-    mapping(bytes32 => mapping(string => VoteSummary)) secondaryChainVotes;
 
     struct VoteSummary {
         uint256 yesVotes;
@@ -54,8 +48,37 @@ contract MainGovernance is Ownable, ReentrancyGuard {
         bool collected;
     }
 
-    // Events
-    event ProposalCreated(bytes32 indexed id, string title, uint256 endTime);
+    struct ProposalInput {
+        string title;
+        string ipfsCid;
+        address[] targets;
+        uint256[] values;
+        bytes[] calldatas;
+        uint256 durationMinutes;
+    }
+
+    mapping(bytes32 => Proposal) public proposals;
+    mapping(bytes32 => mapping(address => bool)) public hasVoted;
+    bytes32[] public proposalIds;
+    mapping(string => bool) public registeredChains;
+    string[] public chainList;
+    mapping(bytes32 => mapping(string => VoteSummary))
+        public secondaryChainVotes;
+
+    event ProposalCreated(
+        bytes32 indexed id,
+        address indexed proposer,
+        address[] targets,
+        uint256[] values,
+        bytes[] calldatas,
+        uint256 startTime,
+        uint256 endTime,
+        string title,
+        string ipfsCid
+    );
+    event RequiredQuorumUpdated(uint256 oldQuorumVotes, uint256 newQuorumVotes);
+    event MinVotingDurationUpdated(uint256 oldDuration, uint256 newDuration);
+    event MaxVotingDurationUpdated(uint256 oldDuration, uint256 newDuration);
     event RelayerUpdated(address indexed newRelayer);
     event Voted(
         bytes32 indexed proposalId,
@@ -66,9 +89,11 @@ contract MainGovernance is Ownable, ReentrancyGuard {
     event VoteTallyFinalized(
         bytes32 indexed id,
         uint256 totalYesVotes,
-        uint256 totalNoVotes
+        uint256 totalNoVotes,
+        bool quorumReached
     );
-    event ProposalExecuted(bytes32 indexed id, ProposalStatus status);
+    event ProposalOutcomeDetermined(bytes32 indexed id, ProposalStatus status);
+    event ProposalActionsExecuted(bytes32 indexed id);
     event SecondaryChainVotesCollected(
         bytes32 indexed proposalId,
         string chainId,
@@ -77,128 +102,157 @@ contract MainGovernance is Ownable, ReentrancyGuard {
     );
     event ChainRegistered(string chainId);
 
-    // Modifiers
     modifier onlyRelayer() {
-        require(msg.sender == relayer, "Only relayer can call");
+        require(msg.sender == relayer, "MainGov: Only relayer");
+        _;
+    }
+
+    modifier validProposal(bytes32 proposalId) {
+        require(
+            proposals[proposalId].startTime > 0,
+            "MainGov: Proposal doesn't exist"
+        );
         _;
     }
 
     constructor(address _token, address _relayer) Ownable(msg.sender) {
-        require(_token != address(0), "Invalid token address");
-        require(_relayer != address(0), "Invalid relayer address");
+        require(_token != address(0), "MainGov: Invalid token");
+        require(_relayer != address(0), "MainGov: Invalid relayer");
         governanceToken = ERC20Votes(_token);
         relayer = _relayer;
+        requiredQuorumVotes = 1000 * 10 ** 18;
+        minVotingDurationMinutes = 4;
+        maxVotingDurationMinutes = 15;
+        emit RequiredQuorumUpdated(0, requiredQuorumVotes);
+        emit MinVotingDurationUpdated(0, minVotingDurationMinutes);
+        emit MaxVotingDurationUpdated(0, maxVotingDurationMinutes);
     }
 
-    /**
-     * @dev Update the relayer address
-     */
+    function setRequiredQuorum(uint256 _newQuorumVotes) external onlyOwner {
+        uint256 oldQuorum = requiredQuorumVotes;
+        requiredQuorumVotes = _newQuorumVotes;
+        emit RequiredQuorumUpdated(oldQuorum, _newQuorumVotes);
+    }
+
+    function setMinVotingDuration(uint256 _minutes) external onlyOwner {
+        require(_minutes <= maxVotingDurationMinutes, "MainGov: Min > Max");
+        emit MinVotingDurationUpdated(minVotingDurationMinutes, _minutes);
+        minVotingDurationMinutes = _minutes;
+    }
+
+    function setMaxVotingDuration(uint256 _minutes) external onlyOwner {
+        require(_minutes >= minVotingDurationMinutes, "MainGov: Max < Min");
+        emit MaxVotingDurationUpdated(maxVotingDurationMinutes, _minutes);
+        maxVotingDurationMinutes = _minutes;
+    }
+
     function updateRelayer(address _newRelayer) external onlyOwner {
-        require(_newRelayer != address(0), "Invalid relayer address");
+        require(_newRelayer != address(0), "MainGov: Invalid relayer");
         relayer = _newRelayer;
         emit RelayerUpdated(_newRelayer);
     }
 
-    /**
-     * @dev Register a secondary chain
-     */
     function addSecondaryChain(string memory chainId) external onlyOwner {
-        require(!registeredChains[chainId], "Chain already registered");
+        require(!registeredChains[chainId], "MainGov: Chain registered");
         registeredChains[chainId] = true;
         chainList.push(chainId);
         emit ChainRegistered(chainId);
     }
 
-    /**
-     * @dev Create a new proposal
-     */
     function createProposal(
-        string memory _title,
-        string memory _description,
-        uint256 _durationMinutes
-    ) external {
-        // This is only for testing purposes
-        require(_durationMinutes >= 5, "Duration too short");
-
-        // Check proposal creator has minimum voting power
-        uint256 votingPower = governanceToken.getVotes(msg.sender);
-        require(votingPower >= 100 * 10 ** 18, "Insufficient voting power");
-
-        // Generate proposal ID
-        proposalNonce++;
-        bytes32 proposalId = keccak256(
-            abi.encodePacked(msg.sender, block.timestamp, proposalNonce)
+        ProposalInput memory input
+    ) external returns (bytes32 proposalId) {
+        require(bytes(input.ipfsCid).length > 0, "MainGov: IPFS CID required");
+        require(
+            input.targets.length == input.values.length &&
+                input.targets.length == input.calldatas.length,
+            "MainGov: Input mismatch"
+        );
+        require(input.targets.length > 0, "MainGov: No targets");
+        require(
+            input.durationMinutes >= minVotingDurationMinutes,
+            "MainGov: Too short"
+        );
+        require(
+            input.durationMinutes <= maxVotingDurationMinutes,
+            "MainGov: Too long"
         );
 
-        // Create proposal
-        Proposal storage newProposal = proposals[proposalId];
-        newProposal.id = proposalId;
-        newProposal.title = _title;
-        newProposal.description = _description;
-        newProposal.startTime = block.timestamp;
-        newProposal.endTime = block.timestamp + (_durationMinutes * 1 minutes);
-        newProposal.status = ProposalStatus.Pending;
+        uint256 votingPower = governanceToken.getVotes(msg.sender);
+        require(votingPower > 0, "MainGov: No voting power");
 
+        proposalNonce++;
+        proposalId = keccak256(
+            abi.encodePacked(
+                msg.sender,
+                block.timestamp,
+                proposalNonce,
+                input.title,
+                input.ipfsCid
+            )
+        );
+
+        Proposal storage p = proposals[proposalId];
+        p.id = proposalId;
+        p.proposer = msg.sender;
+        p.title = input.title;
+        p.ipfsCid = input.ipfsCid;
+        p.targets = input.targets;
+        p.values = input.values;
+        p.calldatas = input.calldatas;
+        p.startTime = block.timestamp;
+        p.endTime = block.timestamp + input.durationMinutes * 1 minutes;
+        p.status = ProposalStatus.Pending;
         proposalIds.push(proposalId);
 
-        emit ProposalCreated(proposalId, _title, newProposal.endTime);
-    }
-
-    /**
-     * @dev Vote on a proposal
-     */
-    function castVote(bytes32 proposalId, bool support) external {
-        Proposal storage proposal = proposals[proposalId];
-
-        require(proposal.startTime > 0, "Proposal doesn't exist");
-        require(block.timestamp < proposal.endTime, "Voting period ended");
-        require(!hasVoted[proposalId][msg.sender], "Already voted");
-
-        // Get voting power from snapshot
-        uint256 votingPower = governanceToken.getPastVotes(
+        emit ProposalCreated(
+            proposalId,
             msg.sender,
-            proposal.startTime
+            input.targets,
+            input.values,
+            input.calldatas,
+            p.startTime,
+            p.endTime,
+            input.title,
+            input.ipfsCid
         );
-        require(votingPower > 0, "No voting power");
-
-        // Record vote
-        if (support) {
-            proposal.yesVotes += votingPower;
-        } else {
-            proposal.noVotes += votingPower;
-        }
-
-        hasVoted[proposalId][msg.sender] = true;
-
-        emit Voted(proposalId, msg.sender, support, votingPower);
     }
 
-    /**
-     * @dev Collect votes from secondary chains
-     */
+    function castVote(
+        bytes32 proposalId,
+        bool support
+    ) external nonReentrant validProposal(proposalId) {
+        Proposal storage p = proposals[proposalId];
+        require(block.timestamp < p.endTime, "MainGov: Voting ended");
+        require(p.status == ProposalStatus.Pending, "MainGov: Not pending");
+        require(!hasVoted[proposalId][msg.sender], "MainGov: Already voted");
+        uint256 votes = governanceToken.getPastVotes(msg.sender, p.startTime);
+        require(votes > 0, "MainGov: No past votes");
+        if (support) p.yesVotes += votes;
+        else p.noVotes += votes;
+        hasVoted[proposalId][msg.sender] = true;
+        emit Voted(proposalId, msg.sender, support, votes);
+    }
+
     function collectSecondaryChainVotes(
         bytes32 proposalId,
         string memory chainId,
         uint256 yesVotes,
         uint256 noVotes
-    ) external onlyRelayer {
-        require(registeredChains[chainId], "Chain not registered");
-        require(
-            block.timestamp >= proposals[proposalId].endTime,
-            "Voting period not ended"
-        );
+    ) external onlyRelayer nonReentrant validProposal(proposalId) {
+        require(registeredChains[chainId], "MainGov: Chain not registered");
+        Proposal storage p = proposals[proposalId];
+        require(block.timestamp >= p.endTime, "MainGov: Voting not ended");
+        require(!p.voteTallyFinalized, "MainGov: Tally done");
         require(
             !secondaryChainVotes[proposalId][chainId].collected,
-            "Votes already collected"
+            "MainGov: Already collected"
         );
-
-        // Store the votes
-        secondaryChainVotes[proposalId][chainId] = VoteSummary({
-            yesVotes: yesVotes,
-            noVotes: noVotes,
-            collected: true
-        });
-
+        secondaryChainVotes[proposalId][chainId] = VoteSummary(
+            yesVotes,
+            noVotes,
+            true
+        );
         emit SecondaryChainVotesCollected(
             proposalId,
             chainId,
@@ -207,87 +261,64 @@ contract MainGovernance is Ownable, ReentrancyGuard {
         );
     }
 
-    /**
-     * @dev Finalize vote tally combining main and secondary chain votes
-     */
-    function finalizeProposalVotes(bytes32 proposalId) external {
-        Proposal storage proposal = proposals[proposalId];
+    function finalizeProposalVotes(
+        bytes32 proposalId
+    ) external nonReentrant validProposal(proposalId) {
+        Proposal storage p = proposals[proposalId];
+        require(block.timestamp >= p.endTime + 1 minutes, "MainGov: Cooldown");
+        require(p.status == ProposalStatus.Pending, "MainGov: Not pending");
+        require(!p.voteTallyFinalized, "MainGov: Already finalized");
 
-        require(proposal.startTime > 0, "Proposal doesn't exist");
-        // Wait for cooldown period of 1 mins after voting ends, This is to ensure that the relayer has enough time to collect votes from all secondary chains
-        require(block.timestamp >= proposal.endTime + 1 minutes, "Cooldown period not ended");
-        require(block.timestamp >= proposal.endTime, "Voting period not ended");
-        require(!proposal.voteTallyFinalized, "Vote already finalized");
-
-        // Start with main chain votes
-        uint256 totalYesVotes = proposal.yesVotes;
-        uint256 totalNoVotes = proposal.noVotes;
-
-        // Add votes from all secondary chains
-        for (uint i = 0; i < chainList.length; i++) {
-            string memory chainId = chainList[i];
-
-            // Skip chains that are no longer registered
-            if (!registeredChains[chainId]) continue;
-
-            VoteSummary storage summary = secondaryChainVotes[proposalId][
-                chainId
+        uint256 yes = p.yesVotes;
+        uint256 no = p.noVotes;
+        for (uint256 i = 0; i < chainList.length; i++) {
+            VoteSummary memory s = secondaryChainVotes[proposalId][
+                chainList[i]
             ];
-
-            if (summary.collected) {
-                totalYesVotes += summary.yesVotes;
-                totalNoVotes += summary.noVotes;
+            if (s.collected) {
+                yes += s.yesVotes;
+                no += s.noVotes;
             }
         }
 
-        proposal.finalYesVotes = totalYesVotes;
-        proposal.finalNoVotes = totalNoVotes;
-        proposal.voteTallyFinalized = true;
+        p.finalYesVotes = yes;
+        p.finalNoVotes = no;
+        p.voteTallyFinalized = true;
 
-        processProposalExecution(proposalId);
+        bool quorumReached = (yes + no) >= requiredQuorumVotes;
+        emit VoteTallyFinalized(proposalId, yes, no, quorumReached);
 
-        emit VoteTallyFinalized(proposalId, totalYesVotes, totalNoVotes);
+        if (quorumReached && yes > no) {
+            p.status = ProposalStatus.Accepted;
+            emit ProposalOutcomeDetermined(proposalId, p.status);
+            _executeProposalActions(proposalId);
+            p.status = ProposalStatus.Executed;
+            p.executed = true;
+            emit ProposalActionsExecuted(proposalId);
+        } else {
+            p.status = ProposalStatus.Rejected;
+            emit ProposalOutcomeDetermined(proposalId, p.status);
+        }
     }
 
-    /**
-     * @dev Execute proposal after votes are finalized
-     */
-    function processProposalExecution(bytes32 proposalId) internal {
-        Proposal storage proposal = proposals[proposalId];
-
-        require(block.timestamp >= proposal.endTime, "Voting period not ended");
-        require(proposal.voteTallyFinalized, "Vote not finalized");
-        require(proposal.status == ProposalStatus.Pending, "Already executed");
-
-        // Set the result
-        proposal.status = proposal.finalYesVotes > proposal.finalNoVotes
-            ? ProposalStatus.Accepted
-            : ProposalStatus.Rejected;
-
-        emit ProposalExecuted(proposalId, proposal.status);
+    function _executeProposalActions(bytes32 proposalId) internal {
+        Proposal storage p = proposals[proposalId];
+        require(p.status == ProposalStatus.Accepted, "MainGov: Not Accepted");
+        require(!p.executed, "MainGov: Already executed");
+        for (uint256 i = 0; i < p.targets.length; i++) {
+            (bool success, ) = p.targets[i].call{value: p.values[i]}(
+                p.calldatas[i]
+            );
+            require(success, "MainGov: Exec failed");
+        }
     }
 
-    /**
-     * @dev Get all proposal IDs
-     */
-    function getProposalIds() external view returns (bytes32[] memory) {
-        return proposalIds;
-    }
-
-    /**
-     * @dev Get proposal details
-     */
     function getProposalDetails(
         bytes32 proposalId
-    ) external view returns (Proposal memory) {
-        Proposal storage proposal = proposals[proposalId];
-        require(proposal.startTime > 0, "Proposal doesn't exist");
-        return proposal;
+    ) external view validProposal(proposalId) returns (Proposal memory) {
+        return proposals[proposalId];
     }
 
-    /**
-     * @dev Check if user has voted on a proposal
-     */
     function hadUserVoted(
         bytes32 proposalId,
         address user
@@ -295,22 +326,25 @@ contract MainGovernance is Ownable, ReentrancyGuard {
         return hasVoted[proposalId][user];
     }
 
-    /**
-     * @dev Get the voting power of a user at the time of proposal creation
-     */
     function getUserVotingPowerAtProposal(
         bytes32 proposalId,
         address user
-    ) external view returns (uint256) {
-        Proposal storage proposal = proposals[proposalId];
-        require(proposal.startTime > 0, "Proposal doesn't exist");
-        return governanceToken.getPastVotes(user, proposal.startTime);
+    ) external view validProposal(proposalId) returns (uint256) {
+        return
+            governanceToken.getPastVotes(user, proposals[proposalId].startTime);
     }
 
-    /**
-     * @dev Get registered chains
-     */
+    function getProposalIds() external view returns (bytes32[] memory) {
+        return proposalIds;
+    }
+
     function getRegisteredChains() external view returns (string[] memory) {
         return chainList;
+    }
+
+    function state(
+        bytes32 proposalId
+    ) external view validProposal(proposalId) returns (ProposalStatus) {
+        return proposals[proposalId].status;
     }
 }

@@ -29,6 +29,44 @@
         "anonymous": false,
         "inputs": [
             {
+                "indexed": false,
+                "internalType": "uint256",
+                "name": "oldDuration",
+                "type": "uint256"
+            },
+            {
+                "indexed": false,
+                "internalType": "uint256",
+                "name": "newDuration",
+                "type": "uint256"
+            }
+        ],
+        "name": "MaxVotingDurationUpdated",
+        "type": "event"
+    },
+    {
+        "anonymous": false,
+        "inputs": [
+            {
+                "indexed": false,
+                "internalType": "uint256",
+                "name": "oldDuration",
+                "type": "uint256"
+            },
+            {
+                "indexed": false,
+                "internalType": "uint256",
+                "name": "newDuration",
+                "type": "uint256"
+            }
+        ],
+        "name": "MinVotingDurationUpdated",
+        "type": "event"
+    },
+    {
+        "anonymous": false,
+        "inputs": [
+            {
                 "indexed": true,
                 "internalType": "address",
                 "name": "previousOwner",
@@ -41,10 +79,32 @@
     },
     {
         "anonymous": false,
+        "inputs": [{ "indexed": true, "internalType": "bytes32", "name": "id", "type": "bytes32" }],
+        "name": "ProposalActionsExecuted",
+        "type": "event"
+    },
+    {
+        "anonymous": false,
         "inputs": [
             { "indexed": true, "internalType": "bytes32", "name": "id", "type": "bytes32" },
+            { "indexed": true, "internalType": "address", "name": "proposer", "type": "address" },
+            {
+                "indexed": false,
+                "internalType": "address[]",
+                "name": "targets",
+                "type": "address[]"
+            },
+            {
+                "indexed": false,
+                "internalType": "uint256[]",
+                "name": "values",
+                "type": "uint256[]"
+            },
+            { "indexed": false, "internalType": "bytes[]", "name": "calldatas", "type": "bytes[]" },
+            { "indexed": false, "internalType": "uint256", "name": "startTime", "type": "uint256" },
+            { "indexed": false, "internalType": "uint256", "name": "endTime", "type": "uint256" },
             { "indexed": false, "internalType": "string", "name": "title", "type": "string" },
-            { "indexed": false, "internalType": "uint256", "name": "endTime", "type": "uint256" }
+            { "indexed": false, "internalType": "string", "name": "ipfsCid", "type": "string" }
         ],
         "name": "ProposalCreated",
         "type": "event"
@@ -60,7 +120,7 @@
                 "type": "uint8"
             }
         ],
-        "name": "ProposalExecuted",
+        "name": "ProposalOutcomeDetermined",
         "type": "event"
     },
     {
@@ -69,6 +129,25 @@
             { "indexed": true, "internalType": "address", "name": "newRelayer", "type": "address" }
         ],
         "name": "RelayerUpdated",
+        "type": "event"
+    },
+    {
+        "anonymous": false,
+        "inputs": [
+            {
+                "indexed": false,
+                "internalType": "uint256",
+                "name": "oldQuorumVotes",
+                "type": "uint256"
+            },
+            {
+                "indexed": false,
+                "internalType": "uint256",
+                "name": "newQuorumVotes",
+                "type": "uint256"
+            }
+        ],
+        "name": "RequiredQuorumUpdated",
         "type": "event"
     },
     {
@@ -97,7 +176,8 @@
                 "internalType": "uint256",
                 "name": "totalNoVotes",
                 "type": "uint256"
-            }
+            },
+            { "indexed": false, "internalType": "bool", "name": "quorumReached", "type": "bool" }
         ],
         "name": "VoteTallyFinalized",
         "type": "event"
@@ -131,6 +211,13 @@
         "type": "function"
     },
     {
+        "inputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+        "name": "chainList",
+        "outputs": [{ "internalType": "string", "name": "", "type": "string" }],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
         "inputs": [
             { "internalType": "bytes32", "name": "proposalId", "type": "bytes32" },
             { "internalType": "string", "name": "chainId", "type": "string" },
@@ -144,12 +231,22 @@
     },
     {
         "inputs": [
-            { "internalType": "string", "name": "_title", "type": "string" },
-            { "internalType": "string", "name": "_description", "type": "string" },
-            { "internalType": "uint256", "name": "_durationMinutes", "type": "uint256" }
+            {
+                "components": [
+                    { "internalType": "string", "name": "title", "type": "string" },
+                    { "internalType": "string", "name": "ipfsCid", "type": "string" },
+                    { "internalType": "address[]", "name": "targets", "type": "address[]" },
+                    { "internalType": "uint256[]", "name": "values", "type": "uint256[]" },
+                    { "internalType": "bytes[]", "name": "calldatas", "type": "bytes[]" },
+                    { "internalType": "uint256", "name": "durationMinutes", "type": "uint256" }
+                ],
+                "internalType": "struct MainGovernance.ProposalInput",
+                "name": "input",
+                "type": "tuple"
+            }
         ],
         "name": "createProposal",
-        "outputs": [],
+        "outputs": [{ "internalType": "bytes32", "name": "proposalId", "type": "bytes32" }],
         "stateMutability": "nonpayable",
         "type": "function"
     },
@@ -167,8 +264,12 @@
             {
                 "components": [
                     { "internalType": "bytes32", "name": "id", "type": "bytes32" },
+                    { "internalType": "address", "name": "proposer", "type": "address" },
                     { "internalType": "string", "name": "title", "type": "string" },
-                    { "internalType": "string", "name": "description", "type": "string" },
+                    { "internalType": "string", "name": "ipfsCid", "type": "string" },
+                    { "internalType": "address[]", "name": "targets", "type": "address[]" },
+                    { "internalType": "uint256[]", "name": "values", "type": "uint256[]" },
+                    { "internalType": "bytes[]", "name": "calldatas", "type": "bytes[]" },
                     { "internalType": "uint256", "name": "yesVotes", "type": "uint256" },
                     { "internalType": "uint256", "name": "noVotes", "type": "uint256" },
                     { "internalType": "uint256", "name": "startTime", "type": "uint256" },
@@ -180,7 +281,8 @@
                     },
                     { "internalType": "uint256", "name": "finalYesVotes", "type": "uint256" },
                     { "internalType": "uint256", "name": "finalNoVotes", "type": "uint256" },
-                    { "internalType": "bool", "name": "voteTallyFinalized", "type": "bool" }
+                    { "internalType": "bool", "name": "voteTallyFinalized", "type": "bool" },
+                    { "internalType": "bool", "name": "executed", "type": "bool" }
                 ],
                 "internalType": "struct MainGovernance.Proposal",
                 "name": "",
@@ -232,6 +334,16 @@
         "type": "function"
     },
     {
+        "inputs": [
+            { "internalType": "bytes32", "name": "", "type": "bytes32" },
+            { "internalType": "address", "name": "", "type": "address" }
+        ],
+        "name": "hasVoted",
+        "outputs": [{ "internalType": "bool", "name": "", "type": "bool" }],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
         "inputs": [],
         "name": "isMainChain",
         "outputs": [{ "internalType": "bool", "name": "", "type": "bool" }],
@@ -240,8 +352,61 @@
     },
     {
         "inputs": [],
+        "name": "maxVotingDurationMinutes",
+        "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "minVotingDurationMinutes",
+        "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [],
         "name": "owner",
         "outputs": [{ "internalType": "address", "name": "", "type": "address" }],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+        "name": "proposalIds",
+        "outputs": [{ "internalType": "bytes32", "name": "", "type": "bytes32" }],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [{ "internalType": "bytes32", "name": "", "type": "bytes32" }],
+        "name": "proposals",
+        "outputs": [
+            { "internalType": "bytes32", "name": "id", "type": "bytes32" },
+            { "internalType": "address", "name": "proposer", "type": "address" },
+            { "internalType": "string", "name": "title", "type": "string" },
+            { "internalType": "string", "name": "ipfsCid", "type": "string" },
+            { "internalType": "uint256", "name": "yesVotes", "type": "uint256" },
+            { "internalType": "uint256", "name": "noVotes", "type": "uint256" },
+            { "internalType": "uint256", "name": "startTime", "type": "uint256" },
+            { "internalType": "uint256", "name": "endTime", "type": "uint256" },
+            {
+                "internalType": "enum MainGovernance.ProposalStatus",
+                "name": "status",
+                "type": "uint8"
+            },
+            { "internalType": "uint256", "name": "finalYesVotes", "type": "uint256" },
+            { "internalType": "uint256", "name": "finalNoVotes", "type": "uint256" },
+            { "internalType": "bool", "name": "voteTallyFinalized", "type": "bool" },
+            { "internalType": "bool", "name": "executed", "type": "bool" }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [{ "internalType": "string", "name": "", "type": "string" }],
+        "name": "registeredChains",
+        "outputs": [{ "internalType": "bool", "name": "", "type": "bool" }],
         "stateMutability": "view",
         "type": "function"
     },
@@ -257,6 +422,57 @@
         "name": "renounceOwnership",
         "outputs": [],
         "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "requiredQuorumVotes",
+        "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            { "internalType": "bytes32", "name": "", "type": "bytes32" },
+            { "internalType": "string", "name": "", "type": "string" }
+        ],
+        "name": "secondaryChainVotes",
+        "outputs": [
+            { "internalType": "uint256", "name": "yesVotes", "type": "uint256" },
+            { "internalType": "uint256", "name": "noVotes", "type": "uint256" },
+            { "internalType": "bool", "name": "collected", "type": "bool" }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [{ "internalType": "uint256", "name": "_minutes", "type": "uint256" }],
+        "name": "setMaxVotingDuration",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [{ "internalType": "uint256", "name": "_minutes", "type": "uint256" }],
+        "name": "setMinVotingDuration",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [{ "internalType": "uint256", "name": "_newQuorumVotes", "type": "uint256" }],
+        "name": "setRequiredQuorum",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [{ "internalType": "bytes32", "name": "proposalId", "type": "bytes32" }],
+        "name": "state",
+        "outputs": [
+            { "internalType": "enum MainGovernance.ProposalStatus", "name": "", "type": "uint8" }
+        ],
+        "stateMutability": "view",
         "type": "function"
     },
     {
