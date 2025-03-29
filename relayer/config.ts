@@ -1,10 +1,9 @@
-
 import fs from "fs";
 import path from "path";
 import * as dotenv from "dotenv";
-import { ethers } from "ethers";
+
 dotenv.config();
-import { WebSocketProvider } from "ethers";
+
 
 export const CONFIG = {
     MAIN: {
