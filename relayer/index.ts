@@ -26,16 +26,16 @@ interface ProposalCache {
 const CONFIG = {
     MAIN: {
         CHAIN_ID: "main",
-        RPC_URL: process.env.BSC_RPC || "",
-        WS_URL: process.env.BSC_WS_URL || "",
-        CONTRACT: "0x4F90cb1474bF846682B267e62cEA52505477B378",
+        RPC_URL: process.env.ARB_RPC || "",
+        WS_URL: process.env.ARB_WS_URL || "",
+        CONTRACT: "0x402BD069C8a175f083025b10C56791340296CC6A",
     },
     SECONDARY_CHAINS: [
         {
-            CHAIN_ID: "arb",
-            RPC_URL: process.env.ARB_RPC || "",
-            WS_URL: process.env.ARB_WS_URL || "",
-            CONTRACT: "0x82ACdE34e54B408E808a8f625648ED4eCe7A745e",
+            CHAIN_ID: "bsc",
+            RPC_URL: process.env.BSC_RPC || "",
+            WS_URL: process.env.BSC_WS_URL || "",
+            CONTRACT: "0xFB063E48457AbD23964427278b1b752ba62Dca1c",
         },
     ],
 };

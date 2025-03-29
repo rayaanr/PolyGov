@@ -90,16 +90,10 @@ contract SecondaryGovernance is Ownable, ReentrancyGuard {
      * @dev Mirror a proposal from the main chain
      */
     function mirrorProposal(
-        bytes32 proposalId,
-        string memory _title,
-        string memory _description,
-        uint256 _startTime,
-        uint256 _endTime
+        bytes32 proposalId, string memory _title, string memory _description,
+        uint256 _startTime, uint256 _endTime
     ) external onlyRelayer {
-        require(
-            proposals[proposalId].startTime == 0,
-            "Proposal already exists"
-        );
+        require( proposals[proposalId].startTime == 0, "Proposal already exists");
 
         proposals[proposalId] = Proposal({
             id: proposalId,

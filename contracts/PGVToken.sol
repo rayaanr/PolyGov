@@ -10,11 +10,9 @@ import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Votes.sol";
  * @dev ERC20 token with governance and timestamp-based voting consistency across chains.
  */
 contract PGVToken is ERC20, ERC20Permit, ERC20Votes {
-    constructor(
-        string memory name,
-        string memory symbol,
-        uint256 initialSupply
-    ) ERC20(name, symbol) ERC20Permit(name) {
+    uint256 public constant MAX_SUPPLY = 10000 * 10 ** 18; // 10,000 tokens
+
+    constructor() ERC20("PGV Governance Token", "PGV") ERC20Permit(name) {
         _mint(msg.sender, initialSupply);
     }
 
@@ -26,9 +24,9 @@ contract PGVToken is ERC20, ERC20Permit, ERC20Votes {
     ) internal override(ERC20, ERC20Votes) {
         super._update(from, to, value);
 
-        // Automatically delegate votes to the recipient if they are not already delegated 
+        // Automatically delegate votes to the recipient
         // and the recipient is not a contract (i.e., a wallet).
-        if (delegates(to) == address(0)  && to.code.length == 0) {
+        if (delegates(to) == address(0) && to.code.length == 0) {
             _delegate(to, to);
         }
     }
