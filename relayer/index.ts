@@ -1,8 +1,10 @@
 import { ethers } from "ethers";
 import dotenv from "dotenv";
 import fs from "fs";
-import path from "path";
 import WebSocket from "ws";
+import { createWebSocketProvider, setupWebSocketHealthCheck } from "./utils/ws";
+import { loadProposalCache, markProposalAsFinalized, saveProposalCache } from "./utils/cache";
+import { CACHE_FILE_PATH, CONFIG, MAIN_GOVERNANCE_ABI, SECONDARY_GOVERNANCE_ABI } from "./config";
 
 dotenv.config();
 
@@ -21,54 +23,6 @@ interface FinalizedProposal {
 interface ProposalCache {
     finalized: FinalizedProposal[];
     lastUpdate: number;
-}
-
-const CONFIG = {
-    MAIN: {
-        CHAIN_ID: "main",
-        RPC_URL: process.env.ARB_RPC || "",
-        WS_URL: process.env.ARB_WS_URL || "",
-        CONTRACT: "0x402BD069C8a175f083025b10C56791340296CC6A",
-    },
-    SECONDARY_CHAINS: [
-        {
-            CHAIN_ID: "bsc",
-            RPC_URL: process.env.BSC_RPC || "",
-            WS_URL: process.env.BSC_WS_URL || "",
-            CONTRACT: "0xFB063E48457AbD23964427278b1b752ba62Dca1c",
-        },
-    ],
-};
-
-const MAIN_GOVERNANCE_ABI = JSON.parse(
-    fs.readFileSync(path.join(__dirname, "../abi/main.json"), "utf8")
-);
-
-const SECONDARY_GOVERNANCE_ABI = JSON.parse(
-    fs.readFileSync(path.join(__dirname, "../abi/secondary.json"), "utf8")
-);
-
-const CACHE_FILE_PATH = path.join(__dirname, "proposal_cache.json");
-
-function createWebSocketProvider(wsUrl: string): ethers.WebSocketProvider {
-    const ws = new WebSocket(wsUrl, {
-        perMessageDeflate: false,
-        timeout: 30000,
-    });
-
-    const provider = new ethers.WebSocketProvider(ws as any, undefined, {
-        pollingInterval: 1000,
-    });
-
-    ws.on("error", (error) => {
-        console.error(`WebSocket error for ${wsUrl}:`, error);
-    });
-
-    ws.on("close", () => {
-        console.log(`WebSocket closed for ${wsUrl}, will attempt to reconnect...`);
-    });
-
-    return provider;
 }
 
 async function initializeContracts(): Promise<{
@@ -137,9 +91,10 @@ function setupMainChainEventListeners(
                     const tx = await contract.mirrorProposal(
                         id,
                         proposal.title,
-                        proposal.description,
+                        proposal.ipfsHash,
                         proposal.startTime,
-                        proposal.endTime
+                        proposal.endTime,
+                        proposal.proposer
                     );
                     await tx.wait();
                     console.log(`✅ Proposal ${id} mirrored to ${chainId}`);
@@ -152,13 +107,34 @@ function setupMainChainEventListeners(
         }
     });
 
-    mainContract.on("ProposalExecuted", async (id, status, event) => {
-        console.log(`🚀 Proposal ${id} executed on main chain with status: ${status}`);
+    mainContract.on("ProposalExecuted", async (id, mainStatus /* BigInt or number */, event) => {
+        console.log(`🚀 Proposal ${id} executed on main chain with status: ${mainStatus}`);
+    
+        // Map MainChain status to SecondaryChain status
+        // Assuming: Main: 0=Pending, 1=Accepted, 2=Rejected, 3=Executed
+        // Assuming: Secondary: 0=Pending, 1=Accepted, 2=Rejected
+        let secondaryStatus: number;
+        const mainStatusNum = Number(mainStatus); // Convert BigInt if necessary
+    
+        if (mainStatusNum === 1 || mainStatusNum === 3) { // Accepted or Executed on Main maps to Accepted on Secondary
+            secondaryStatus = 1;
+        } else if (mainStatusNum === 2) { // Rejected on Main maps to Rejected on Secondary
+            secondaryStatus = 2;
+        } else {
+            console.log(`ℹ️ Skipping status update for proposal ${id} due to main status: ${mainStatusNum}`);
+            return; // Or map Pending to Pending (0) if desired
+        }
+    
         for (const [chainId, { contract }] of Object.entries(secondaryConnections)) {
             try {
-                const tx = await contract.updateProposalStatus(id, status);
+                // Check current secondary status if needed before updating
+                // const secondaryProposal = await contract.getProposalDetails(id);
+                // if (secondaryProposal.status === secondaryStatus) continue;
+    
+                console.log(`🔄 Updating proposal ${id} status to ${secondaryStatus} on ${chainId}`);
+                const tx = await contract.updateProposalStatus(id, secondaryStatus);
                 await tx.wait();
-                console.log(`✅ Updated proposal ${id} status to ${status} on ${chainId}`);
+                console.log(`✅ Updated proposal ${id} status to ${secondaryStatus} on ${chainId}`);
             } catch (error) {
                 console.error(`❌ Error updating proposal status on ${chainId}:`, error);
             }
@@ -212,20 +188,55 @@ async function finalizeVotesIfPossible(
     cache: ProposalCache
 ): Promise<void> {
     const currentTime = Math.floor(Date.now() / 1000);
-    const cooldownEndTime = Number(endTime) + 3 * 60;
 
-    if (currentTime >= cooldownEndTime) {
+    if (currentTime < endTime) {
+        console.log(`⏩ Voting still ongoing for proposal ${proposalId}`);
+        return;
+    }
+
+    try {
+        const proposal = await mainContract.getProposalDetails(proposalId);
+
+        console.log(`🔍 voteTallyFinalized status for ${proposalId}:`, proposal.voteTallyFinalized);
+
+        if (proposal.voteTallyFinalized === true || proposal.voteTallyFinalized === "true") {
+            console.log(`⏩ Proposal ${proposalId} already finalized`);
+            markProposalAsFinalized(proposalId.toString(), cache);
+            return;
+        }
+
+        const registeredChains = await mainContract.getRegisteredChains();
+        for (const chainId of registeredChains) {
+            const votes = await mainContract.secondaryChainVotes(proposalId, chainId);
+            if (!votes.collected) {
+                console.log(`⏩ Skipping finalization: votes from ${chainId} not collected yet`);
+                return;
+            }
+        }
+
         try {
-            console.log(`🔢 Finalizing vote tally for proposal ${proposalId}`);
             const finalizeTx = await mainContract.finalizeProposalVotes(proposalId);
             await finalizeTx.wait();
             console.log(`✅ Finalized vote tally for proposal ${proposalId}`);
             markProposalAsFinalized(proposalId.toString(), cache);
-        } catch (error) {
-            console.error(`❌ Error finalizing proposal ${proposalId}:`, error);
+        } catch (err: any) {
+            const msg = err?.reason || err?.error?.message || "";
+            if (
+                msg.toLowerCase().includes("already finalized") ||
+                err?.error?.data?.includes("already finalized")
+            ) {
+                console.log(`⚠️ Proposal ${proposalId} already finalized (fallback catch)`);
+                markProposalAsFinalized(proposalId.toString(), cache);
+                return;
+            }
+            console.error(`❌ Error finalizing proposal ${proposalId}:`, err);
         }
+
+    } catch (error) {
+        console.error(`❌ Error finalizing proposal ${proposalId}:`, error);
     }
 }
+
 
 async function mirrorAndFinalizeProposal(
     contract: ethers.Contract,
@@ -238,9 +249,10 @@ async function mirrorAndFinalizeProposal(
         const tx = await contract.mirrorProposal(
             proposalId,
             proposal.title,
-            proposal.description,
+            proposal.ipfsHash,
             proposal.startTime,
-            proposal.endTime
+            proposal.endTime,
+            proposal.proposer
         );
         await tx.wait();
         console.log(`✅ Proposal ${proposalId} mirrored to ${chainId}`);
@@ -331,7 +343,7 @@ async function syncExistingProposals(
                         try {
                             secondaryProposal = await contract.getProposalDetails(proposalId);
                             console.log(
-                                `ℹ️ Proposal ${proposalId} found on ${chainId}, voteTallied: ${secondaryProposal.voteTallied}`
+                                `ℹ️ Proposal ${proposalId} found on ${chainId}, voteTallied: ${secondaryProposal.voteFinalized}`
                             );
                         } catch (err) {
                             console.log(`⚠️ Proposal ${proposalId} not found on ${chainId}`);
@@ -349,7 +361,7 @@ async function syncExistingProposals(
                                 chainId,
                                 isExpired
                             );
-                        } else if (isExpired && !secondaryProposal.voteTallied) {
+                        } else if (isExpired && !secondaryProposal.voteFinalized) {
                             console.log(
                                 `⏳ Proposal ${proposalId} exists but not finalized on ${chainId}, finalizing`
                             );
@@ -399,34 +411,6 @@ async function syncExistingProposals(
     }
 }
 
-function loadProposalCache(): ProposalCache {
-    try {
-        if (fs.existsSync(CACHE_FILE_PATH)) {
-            return JSON.parse(fs.readFileSync(CACHE_FILE_PATH, "utf8"));
-        }
-    } catch (error) {
-        console.error("Error loading proposal cache:", error);
-    }
-    return { finalized: [], lastUpdate: 0 };
-}
-
-function saveProposalCache(cache: ProposalCache) {
-    try {
-        fs.writeFileSync(CACHE_FILE_PATH, JSON.stringify(cache, null, 2));
-    } catch (error) {
-        console.error("Error saving proposal cache:", error);
-    }
-}
-
-function markProposalAsFinalized(proposalId: string, cache: ProposalCache) {
-    cache.finalized.push({
-        id: proposalId,
-        timestamp: Math.floor(Date.now() / 1000),
-    });
-    cache.lastUpdate = Math.floor(Date.now() / 1000);
-    saveProposalCache(cache);
-}
-
 async function processEndedProposals(
     mainContract: ethers.Contract,
     secondaryConnections: Record<string, ContractConnections>
@@ -468,7 +452,7 @@ async function processEndedProposals(
                         try {
                             secondaryProposal = await contract.getProposalDetails(proposalId);
                             console.log(
-                                `ℹ️ Proposal ${proposalId} on ${chainId} - VoteTallied: ${secondaryProposal.voteTallied}`
+                                `ℹ️ Proposal ${proposalId} on ${chainId} - VoteTallied: ${secondaryProposal.voteFinalized}`
                             );
                         } catch (err) {
                             console.log(`⚠️ Proposal ${proposalId} not found on ${chainId}`);
@@ -513,7 +497,7 @@ async function processEndedProposals(
                         }
 
                         if (
-                            !secondaryProposal.voteTallied &&
+                            !secondaryProposal.voteFinalized &&
                             Number(secondaryProposal.endTime) <= currentTime
                         ) {
                             console.log(`🗳️ Finalizing votes for ${proposalId} on ${chainId}`);
@@ -523,7 +507,7 @@ async function processEndedProposals(
                             secondaryProposal = await contract.getProposalDetails(proposalId);
                         }
 
-                        if (secondaryProposal.voteTallied && !votesCollected) {
+                        if (secondaryProposal.voteFinalized && !votesCollected) {
                             console.log(`📊 Collecting votes for ${proposalId} from ${chainId}`);
                             try {
                                 const collectTx = await mainContract.collectSecondaryChainVotes(
@@ -575,74 +559,6 @@ async function processEndedProposals(
     } catch (error) {
         console.error("❌ Error processing ended proposals:", error);
     }
-}
-
-function setupWebSocketHealthCheck(
-    connections: {
-        main: ContractConnections;
-        secondary: Record<string, ContractConnections>;
-    },
-    options = {
-        checkInterval: 60000,
-        maxReconnectAttempts: 5,
-        reconnectDelay: 5000,
-    }
-) {
-    const reconnectAttempts: Record<string, number> = {};
-
-    async function attemptReconnect(chainId: string, isMain: boolean) {
-        const connection = isMain ? connections.main : connections.secondary[chainId];
-        const maxAttempts = options.maxReconnectAttempts;
-        const currentAttempts = reconnectAttempts[chainId] || 0;
-
-        if (currentAttempts >= maxAttempts) {
-            console.error(`❌ Max reconnection attempts reached for ${chainId}`);
-            return;
-        }
-
-        reconnectAttempts[chainId] = currentAttempts + 1;
-
-        try {
-            if (isMain) {
-                await reconnectMainChain(connections);
-            } else {
-                await reconnectSecondaryChain(connections, chainId);
-            }
-            reconnectAttempts[chainId] = 0;
-        } catch (error) {
-            console.error(`❌ Reconnection attempt ${currentAttempts + 1} failed for ${chainId}`);
-            setTimeout(() => attemptReconnect(chainId, isMain), options.reconnectDelay);
-        }
-    }
-
-    setInterval(() => {
-        const mainWs = connections.main.wsInstance;
-        if (
-            !mainWs ||
-            mainWs.readyState === WebSocket.CLOSED ||
-            mainWs.readyState === WebSocket.CLOSING
-        ) {
-            console.log("🔄 Main chain WebSocket disconnected, attempting reconnection...");
-            attemptReconnect("main", true);
-        }
-        for (const [chainId, connection] of Object.entries(connections.secondary)) {
-            const ws = connection.wsInstance;
-            if (!ws || ws.readyState === WebSocket.CLOSED || ws.readyState === WebSocket.CLOSING) {
-                console.log(
-                    `🔄 ${chainId} chain WebSocket disconnected, attempting reconnection...`
-                );
-                attemptReconnect(chainId, false);
-            }
-        }
-    }, options.checkInterval);
-
-    process.on("uncaughtException", (error) => {
-        console.error("Uncaught exception:", error);
-        attemptReconnect("main", true);
-        for (const chainId of Object.keys(connections.secondary)) {
-            attemptReconnect(chainId, false);
-        }
-    });
 }
 
 async function reconnectMainChain(connections: {
@@ -731,7 +647,11 @@ async function main() {
         }
 
         const connections = await initializeContracts();
-        setupWebSocketHealthCheck(connections);
+        setupWebSocketHealthCheck(connections, {
+            reconnectMain: async () => reconnectMainChain(connections),
+            reconnectSecondary: async (chainId: string) =>
+                reconnectSecondaryChain(connections, chainId),
+        });
         setupMainChainEventListeners(connections.main.contract, connections.secondary);
         setupSecondaryChainEventListeners(connections.main.contract, connections.secondary);
         await syncExistingProposals(connections.main.contract, connections.secondary);

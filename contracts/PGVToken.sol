@@ -24,8 +24,7 @@ contract PGVToken is ERC20, ERC20Permit, ERC20Votes {
     ) internal override(ERC20, ERC20Votes) {
         super._update(from, to, value);
 
-        // Automatically delegate votes to the recipient
-        // and the recipient is not a contract (i.e., a wallet).
+        // Automatically delegate votes to the recipient if the recipient is not a contract (i.e., a wallet).
         if (delegates(to) == address(0) && to.code.length == 0) {
             _delegate(to, to);
         }
@@ -33,7 +32,7 @@ contract PGVToken is ERC20, ERC20Permit, ERC20Votes {
 
     // clokc() & CLOCK_MODE() are needs to be modified like this according to https://github.com/OpenZeppelin/openzeppelin-contracts/blob/fda6b85f2c65d146b86d513a604554d15abd6679/contracts/governance/utils/Votes.sol#L54-L57
 
-    // Override clock on snapshot from block number to block timestamp
+    // Override clock on snapshot from block number to block timestamp which is nessary for MultiChain proposal support
     function clock() public view override returns (uint48) {
         return uint48(block.timestamp);
     }
