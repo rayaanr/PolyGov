@@ -5,25 +5,10 @@ import WebSocket from "ws";
 import { createWebSocketProvider, setupWebSocketHealthCheck } from "./utils/ws";
 import { loadProposalCache, markProposalAsFinalized, saveProposalCache } from "./utils/cache";
 import { CACHE_FILE_PATH, CONFIG, MAIN_GOVERNANCE_ABI, SECONDARY_GOVERNANCE_ABI } from "./config";
+import { reconnectMainChain, reconnectSecondaryChain } from "./utils/reconnect";
+import { ContractConnections, ProposalCache } from "./types";
 
 dotenv.config();
-
-interface ContractConnections {
-    provider: ethers.WebSocketProvider;
-    contract: ethers.Contract;
-    signer: ethers.Wallet;
-    wsInstance?: WebSocket;
-}
-
-interface FinalizedProposal {
-    id: string;
-    timestamp: number;
-}
-
-interface ProposalCache {
-    finalized: FinalizedProposal[];
-    lastUpdate: number;
-}
 
 async function initializeContracts(): Promise<{
     main: ContractConnections;
@@ -68,7 +53,7 @@ async function initializeContracts(): Promise<{
     };
 }
 
-function setupMainChainEventListeners(
+export function setupMainChainEventListeners(
     mainContract: ethers.Contract,
     secondaryConnections: Record<string, ContractConnections>
 ) {
@@ -109,29 +94,35 @@ function setupMainChainEventListeners(
 
     mainContract.on("ProposalExecuted", async (id, mainStatus /* BigInt or number */, event) => {
         console.log(`🚀 Proposal ${id} executed on main chain with status: ${mainStatus}`);
-    
+
         // Map MainChain status to SecondaryChain status
         // Assuming: Main: 0=Pending, 1=Accepted, 2=Rejected, 3=Executed
         // Assuming: Secondary: 0=Pending, 1=Accepted, 2=Rejected
         let secondaryStatus: number;
         const mainStatusNum = Number(mainStatus); // Convert BigInt if necessary
-    
-        if (mainStatusNum === 1 || mainStatusNum === 3) { // Accepted or Executed on Main maps to Accepted on Secondary
+
+        if (mainStatusNum === 1 || mainStatusNum === 3) {
+            // Accepted or Executed on Main maps to Accepted on Secondary
             secondaryStatus = 1;
-        } else if (mainStatusNum === 2) { // Rejected on Main maps to Rejected on Secondary
+        } else if (mainStatusNum === 2) {
+            // Rejected on Main maps to Rejected on Secondary
             secondaryStatus = 2;
         } else {
-            console.log(`ℹ️ Skipping status update for proposal ${id} due to main status: ${mainStatusNum}`);
+            console.log(
+                `ℹ️ Skipping status update for proposal ${id} due to main status: ${mainStatusNum}`
+            );
             return; // Or map Pending to Pending (0) if desired
         }
-    
+
         for (const [chainId, { contract }] of Object.entries(secondaryConnections)) {
             try {
                 // Check current secondary status if needed before updating
                 // const secondaryProposal = await contract.getProposalDetails(id);
                 // if (secondaryProposal.status === secondaryStatus) continue;
-    
-                console.log(`🔄 Updating proposal ${id} status to ${secondaryStatus} on ${chainId}`);
+
+                console.log(
+                    `🔄 Updating proposal ${id} status to ${secondaryStatus} on ${chainId}`
+                );
                 const tx = await contract.updateProposalStatus(id, secondaryStatus);
                 await tx.wait();
                 console.log(`✅ Updated proposal ${id} status to ${secondaryStatus} on ${chainId}`);
@@ -231,12 +222,10 @@ async function finalizeVotesIfPossible(
             }
             console.error(`❌ Error finalizing proposal ${proposalId}:`, err);
         }
-
     } catch (error) {
         console.error(`❌ Error finalizing proposal ${proposalId}:`, error);
     }
 }
-
 
 async function mirrorAndFinalizeProposal(
     contract: ethers.Contract,
@@ -558,70 +547,6 @@ async function processEndedProposals(
         }
     } catch (error) {
         console.error("❌ Error processing ended proposals:", error);
-    }
-}
-
-async function reconnectMainChain(connections: {
-    main: ContractConnections;
-    secondary: Record<string, ContractConnections>;
-}) {
-    try {
-        await connections.main.provider.destroy();
-        const mainProvider = createWebSocketProvider(CONFIG.MAIN.WS_URL);
-        const mainSigner = new ethers.Wallet(process.env.RELAYER_PVT_KEY!, mainProvider);
-        const mainContract = new ethers.Contract(
-            CONFIG.MAIN.CONTRACT,
-            MAIN_GOVERNANCE_ABI,
-            mainSigner
-        );
-
-        connections.main = {
-            provider: mainProvider,
-            contract: mainContract,
-            signer: mainSigner,
-            wsInstance: mainProvider.websocket as WebSocket,
-        };
-
-        setupMainChainEventListeners(mainContract, connections.secondary);
-        console.log("✅ Successfully reconnected to main chain");
-    } catch (error) {
-        throw new Error(`Failed to reconnect to main chain: ${error}`);
-    }
-}
-
-async function reconnectSecondaryChain(
-    connections: {
-        main: ContractConnections;
-        secondary: Record<string, ContractConnections>;
-    },
-    chainId: string
-) {
-    try {
-        const chainConfig = CONFIG.SECONDARY_CHAINS.find((c) => c.CHAIN_ID === chainId);
-        if (!chainConfig) throw new Error(`No config for chain ${chainId}`);
-        await connections.secondary[chainId].provider.destroy();
-        const provider = createWebSocketProvider(chainConfig.WS_URL);
-        const signer = new ethers.Wallet(process.env.RELAYER_PVT_KEY!, provider);
-        const contract = new ethers.Contract(
-            chainConfig.CONTRACT,
-            SECONDARY_GOVERNANCE_ABI,
-            signer
-        );
-
-        connections.secondary[chainId] = {
-            provider,
-            contract,
-            signer,
-            wsInstance: provider.websocket as WebSocket,
-        };
-
-        setupSecondaryChainEventListeners(connections.main.contract, {
-            [chainId]: connections.secondary[chainId],
-        });
-
-        console.log(`✅ Successfully reconnected to ${chainId} chain`);
-    } catch (error) {
-        throw new Error(`Failed to reconnect to ${chainId} chain: ${error}`);
     }
 }
 
