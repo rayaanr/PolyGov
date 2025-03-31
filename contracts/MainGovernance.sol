@@ -13,8 +13,8 @@ contract MainGovernance is Ownable, ReentrancyGuard {
     ERC20Votes public governanceToken;
     address public relayer;
     uint256 public quorumVotes = 1000 * 10 ** 18;
-    uint256 public minCreationPower = 100 * 10 ** 18;
-    uint256 public minVotingDuration = 0;
+    uint256 public constant MIN_CREATION_POWER = 100 * 10 ** 18;
+    uint256 public constant MIN_VOTING_DURATION = 1;
     uint256 proposalNonce;
 
     enum ProposalStatus {
@@ -32,7 +32,7 @@ contract MainGovernance is Ownable, ReentrancyGuard {
         uint256 noVotes;
         uint256 startTime;
         uint256 endTime;
-        address proposer; 
+        address proposer;
         ProposalStatus status;
         uint256 finalYesVotes;
         uint256 finalNoVotes;
@@ -81,8 +81,6 @@ contract MainGovernance is Ownable, ReentrancyGuard {
     );
     event ChainRegistered(string chainId);
     event QuorumUpdated(uint256 newQuorum);
-    event MinCreationPowerUpdated(uint256 newQuorum);
-    event MinVotingDurationUpdated(uint256 newQuorum);
 
     // ===================== Custom Errors ===================== //
     error ProposalNotFound(bytes32 proposalId);
@@ -118,20 +116,6 @@ contract MainGovernance is Ownable, ReentrancyGuard {
         emit QuorumUpdated(_newQuorum);
     }
 
-    /// @notice Update the quorum threshold
-    function updateMinCreationPower(uint256 _newMinCreationPower) external onlyOwner {
-        require(_newMinCreationPower > 0, "Minimum creation power must be positive");
-        minCreationPower = _newMinCreationPower;
-        emit MinCreationPowerUpdated(_newMinCreationPower);
-    }
-
-    /// @notice Update the quorum threshold
-    function updateMinVotingDuration(uint256 _newMinVotingDuration) external onlyOwner {
-        require(_newMinVotingDuration > 0, "Minimum voting duration must be positive");
-        minVotingDuration = _newMinVotingDuration;
-        emit MinVotingDurationUpdated(_newMinVotingDuration);
-    }
-
     /// @notice Register a new secondary chain
     function addSecondaryChain(string memory chainId) external onlyOwner {
         require(!registeredChains[chainId], "Chain already registered");
@@ -149,7 +133,7 @@ contract MainGovernance is Ownable, ReentrancyGuard {
         uint256[] memory _values,
         bytes[] memory _calldatas
     ) external {
-        require(_durationMinutes > minVotingDuration, "Duration too short");
+        require(_durationMinutes > MIN_VOTING_DURATION, "Duration too short");
         require(
             _targets.length == _values.length &&
                 _targets.length == _calldatas.length,
@@ -157,7 +141,7 @@ contract MainGovernance is Ownable, ReentrancyGuard {
         );
 
         uint256 votingPower = governanceToken.getVotes(msg.sender);
-        require(votingPower >= minCreationPower, "Insufficient voting power");
+        require(votingPower >= MIN_CREATION_POWER, "Insufficient voting power");
 
         proposalNonce++;
         bytes32 proposalId = keccak256(
@@ -261,7 +245,10 @@ contract MainGovernance is Ownable, ReentrancyGuard {
 
         uint256 totalVotes = totalYesVotes + totalNoVotes;
         if (totalVotes < quorumVotes) {
-            revert QuorumNotReached(totalVotes, quorumVotes);
+            proposal.voteTallyFinalized = true;
+            proposal.status = ProposalStatus.Rejected;
+            emit VoteTallyFinalized(proposalId, totalYesVotes, totalNoVotes);
+            return;
         }
 
         proposal.finalYesVotes = totalYesVotes;
