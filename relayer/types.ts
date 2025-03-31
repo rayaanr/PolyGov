@@ -17,3 +17,8 @@ export interface ProposalCache {
     finalized: FinalizedProposal[];
     lastUpdate: number;
 }
+
+export interface EthersError {
+    error?: { data?: string };
+    data?: string;
+}

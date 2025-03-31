@@ -1,4 +1,4 @@
-import { ethers } from "ethers";
+import { Wallet, Contract } from "ethers";
 import dotenv from "dotenv";
 import fs from "fs";
 import WebSocket from "ws";
@@ -6,17 +6,11 @@ import { createWebSocketProvider, setupWebSocketHealthCheck } from "./utils/ws";
 import { loadProposalCache, markProposalAsFinalized, saveProposalCache } from "./utils/cache";
 import { CACHE_FILE_PATH, CONFIG, MAIN_GOVERNANCE_ABI, SECONDARY_GOVERNANCE_ABI } from "./config";
 import { reconnectMainChain, reconnectSecondaryChain } from "./utils/reconnect";
-import { ContractConnections, ProposalCache } from "./types";
+import { type ContractConnections, type EthersError, type ProposalCache } from "./types";
 import { decodeCustomError } from "./utils/decodeCustomError";
 import { sendTransactionWithManagedNonce } from "./utils/transaction";
 
 dotenv.config();
-
-interface EthersError {
-    error?: { data?: string };
-    data?: string;
-}
-
 
 async function initializeContracts(): Promise<{
     main: ContractConnections;
@@ -27,16 +21,16 @@ async function initializeContracts(): Promise<{
     }
 
     const mainProvider = createWebSocketProvider(CONFIG.MAIN.WS_URL);
-    const mainSigner = new ethers.Wallet(process.env.RELAYER_PVT_KEY, mainProvider);
-    const mainContract = new ethers.Contract(CONFIG.MAIN.CONTRACT, MAIN_GOVERNANCE_ABI, mainSigner);
+    const mainSigner = new Wallet(process.env.RELAYER_PVT_KEY, mainProvider);
+    const mainContract = new Contract(CONFIG.MAIN.CONTRACT, MAIN_GOVERNANCE_ABI, mainSigner);
 
     const secondaryConnections: Record<string, ContractConnections> = {};
 
     for (const chain of CONFIG.SECONDARY_CHAINS) {
         try {
             const provider = createWebSocketProvider(chain.WS_URL);
-            const signer = new ethers.Wallet(process.env.RELAYER_PVT_KEY, provider);
-            const contract = new ethers.Contract(chain.CONTRACT, SECONDARY_GOVERNANCE_ABI, signer);
+            const signer = new Wallet(process.env.RELAYER_PVT_KEY, provider);
+            const contract = new Contract(chain.CONTRACT, SECONDARY_GOVERNANCE_ABI, signer);
 
             secondaryConnections[chain.CHAIN_ID] = {
                 provider,
@@ -62,7 +56,7 @@ async function initializeContracts(): Promise<{
 }
 
 export function setupMainChainEventListeners(
-    mainContract: ethers.Contract,
+    mainContract: Contract,
     secondaryConnections: Record<string, ContractConnections>
 ) {
     console.log("🎧 Setting up event listeners for main chain");
@@ -152,7 +146,7 @@ export function setupMainChainEventListeners(
 
 
 async function checkAndCollectVotes(
-    mainContract: ethers.Contract,
+    mainContract: Contract,
     chainId: string,
     proposalId: string,
     yesVotes: bigint,
@@ -184,7 +178,7 @@ async function checkAndCollectVotes(
 }
 
 async function finalizeVotesIfPossible(
-    mainContract: ethers.Contract,
+    mainContract: Contract,
     proposalId: string,
     endTime: number,
     cache: ProposalCache
@@ -237,7 +231,7 @@ async function finalizeVotesIfPossible(
 }
 
 async function mirrorAndFinalizeProposal(
-    contract: ethers.Contract,
+    contract: Contract,
     proposalId: string,
     proposal: any,
     chainId: string,
@@ -268,7 +262,7 @@ async function mirrorAndFinalizeProposal(
 }
 
 function setupSecondaryChainEventListeners(
-    mainContract: ethers.Contract,
+    mainContract: Contract,
     secondaryConnections: Record<string, ContractConnections>
 ) {
     console.log("🎧 Setting up event listeners for secondary chains");
@@ -300,7 +294,7 @@ function setupSecondaryChainEventListeners(
 }
 
 async function syncExistingProposals(
-    mainContract: ethers.Contract,
+    mainContract: Contract,
     secondaryConnections: Record<string, ContractConnections>
 ) {
     console.log("🔄 Syncing existing proposals from main chain to secondary chains");
@@ -410,7 +404,7 @@ async function syncExistingProposals(
 }
 
 async function processEndedProposals(
-    mainContract: ethers.Contract,
+    mainContract: Contract,
     secondaryConnections: Record<string, ContractConnections>
 ) {
     console.log("🔄 Processing proposals with ended voting periods");
@@ -571,7 +565,7 @@ async function processEndedProposals(
 }
 
 function scheduleRecurringTasks(
-    mainContract: ethers.Contract,
+    mainContract: Contract,
     secondaryConnections: Record<string, ContractConnections>
 ) {
     setInterval(async () => {

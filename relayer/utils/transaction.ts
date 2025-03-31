@@ -1,11 +1,10 @@
-// utils/transaction.ts
-import { ethers } from "ethers";
+import { Provider, Contract, Wallet, TransactionReceipt } from "ethers";
 import NonceManager from "./nonceManager";
 
 // Map to store nonce managers for each provider
 const nonceManagers = new Map<string, NonceManager>();
 
-export function getNonceManager(provider: ethers.Provider): NonceManager {
+export function getNonceManager(provider:Provider): NonceManager {
     const providerId = (provider as any).connection?.url || "default";
     if (!nonceManagers.has(providerId)) {
         nonceManagers.set(providerId, new NonceManager(provider));
@@ -14,12 +13,12 @@ export function getNonceManager(provider: ethers.Provider): NonceManager {
 }
 
 export async function sendTransactionWithManagedNonce(
-    contract: ethers.Contract,
+    contract: Contract,
     method: string,
     args: any[],
     retries = 3
-): Promise<ethers.TransactionReceipt> {
-    const signer = contract.runner as ethers.Wallet;
+): Promise<TransactionReceipt> {
+    const signer = contract.runner as Wallet;
     const address = await signer.getAddress();
     const provider = signer.provider!;
     const nonceManager = getNonceManager(provider);

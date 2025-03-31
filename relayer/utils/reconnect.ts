@@ -1,10 +1,9 @@
-import { ethers } from "ethers";
+import { Wallet, Contract } from "ethers";
 import { CONFIG, MAIN_GOVERNANCE_ABI, SECONDARY_GOVERNANCE_ABI } from "../config";
 import { createWebSocketProvider } from "./ws";
 import WebSocket from "ws";
-import { ContractConnections } from "../types";
+import { type ContractConnections } from "../types";
 import { setupMainChainEventListeners } from "..";
-
 
 export async function reconnectMainChain(connections: {
     main: ContractConnections;
@@ -13,8 +12,8 @@ export async function reconnectMainChain(connections: {
     try {
         await connections.main.provider.destroy();
         const mainProvider = createWebSocketProvider(CONFIG.MAIN.WS_URL);
-        const mainSigner = new ethers.Wallet(process.env.RELAYER_PVT_KEY!, mainProvider);
-        const mainContract = new ethers.Contract(
+        const mainSigner = new Wallet(process.env.RELAYER_PVT_KEY!, mainProvider);
+        const mainContract = new Contract(
             CONFIG.MAIN.CONTRACT,
             MAIN_GOVERNANCE_ABI,
             mainSigner
@@ -46,8 +45,8 @@ export async function reconnectSecondaryChain(
         if (!chainConfig) throw new Error(`No config for chain ${chainId}`);
         await connections.secondary[chainId].provider.destroy();
         const provider = createWebSocketProvider(chainConfig.WS_URL);
-        const signer = new ethers.Wallet(process.env.RELAYER_PVT_KEY!, provider);
-        const contract = new ethers.Contract(
+        const signer = new Wallet(process.env.RELAYER_PVT_KEY!, provider);
+        const contract = new Contract(
             chainConfig.CONTRACT,
             SECONDARY_GOVERNANCE_ABI,
             signer
