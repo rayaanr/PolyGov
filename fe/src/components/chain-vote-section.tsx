@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import {
@@ -23,6 +23,9 @@ import { useHasUserVoted } from "@/hooks/useHasUserVoted";
 const TOTAL_TOKENS_PER_CHAIN = BigInt(10000 * 10 ** 18); // 10,000 tokens in 10^18 format
 const PENDING_STATUS = 0;
 
+// Extracted utility function for reuse
+const formatTokenAmount = (amount: bigint) => (Number(amount) / 10 ** 18).toLocaleString();
+
 interface ChainVoteSectionProps {
     proposal: CombinedProposal;
     id: string;
@@ -33,6 +36,7 @@ export function ChainVoteSection({ proposal, id }: ChainVoteSectionProps) {
         proposal.secondaryProposals[0]?.chainName || "main"
     );
     const [voteType, setVoteType] = useState<boolean | null>(null);
+    const [isVoting, setIsVoting] = useState(false);
 
     const { isConnected } = useAccount();
     const { voteOnProposal, isPending } = useVoteOnProposal();
@@ -43,18 +47,72 @@ export function ChainVoteSection({ proposal, id }: ChainVoteSectionProps) {
         error: votingPowerError,
     } = useVotingPower(id);
 
-    // Format token amount from BigInt to readable number
-    const formatTokenAmount = (amount: bigint) => (Number(amount) / 10 ** 18).toLocaleString();
+    // Check if voting is active based on status - memoized
+    const isVotingActive = useMemo(
+        () => proposal.mainProposal.status === PENDING_STATUS,
+        [proposal.mainProposal.status]
+    );
 
-    // Check if voting is active based on status
-    const isVotingActive = proposal.mainProposal.status === PENDING_STATUS;
+    // Handle vote submission - memoized callback
+    const handleVote = useCallback(async () => {
+        if (voteType === null || !isConnected || hasVoted) return;
 
-    // Handle vote submission
-    const handleVote = () => {
-        if (voteType !== null && isConnected && !hasVoted) {
-            voteOnProposal(id, voteType);
+        try {
+            setIsVoting(true);
+            await voteOnProposal(id, voteType);
+        } catch (error) {
+            console.error("Voting failed:", error);
+        } finally {
+            setIsVoting(false);
         }
-    };
+    }, [voteType, isConnected, hasVoted, voteOnProposal, id]);
+
+    // Determine button state - memoized
+    const buttonState = useMemo(() => {
+        if (!isConnected) {
+            return { disabled: true, text: "Connect your wallet to vote" };
+        }
+        if (isPending || isVoting) {
+            return { disabled: true, text: "Submitting vote..." };
+        }
+        if (isLoadingHasVoted) {
+            return { disabled: true, text: "Loading..." };
+        }
+        if (hasVoted) {
+            return { disabled: true, text: "You have already voted" };
+        }
+        if (isLoadingVotingPower) {
+            return { disabled: true, text: "Loading voting power..." };
+        }
+        if (votingPowerError) {
+            return { disabled: true, text: "Error loading voting power" };
+        }
+        if (votingPower === BigInt(0)) {
+            return { disabled: true, text: "No voting power" };
+        }
+        if (!isVotingActive) {
+            return { disabled: true, text: "Voting closed" };
+        }
+        if (voteType === null) {
+            return { disabled: true, text: "Select a vote option" };
+        }
+
+        return {
+            disabled: false,
+            text: "Submit Vote",
+        };
+    }, [
+        isConnected,
+        isPending,
+        isVoting,
+        isLoadingHasVoted,
+        hasVoted,
+        isLoadingVotingPower,
+        votingPowerError,
+        votingPower,
+        isVotingActive,
+        voteType,
+    ]);
 
     return (
         <Card>
@@ -65,101 +123,70 @@ export function ChainVoteSection({ proposal, id }: ChainVoteSectionProps) {
                 </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-                {/* Wallet Connection Status */}
-                {!isConnected ? (
-                    <div className="text-center space-y-4">
-                        <p className="text-sm text-yellow-500">
-                            You are not connected to a wallet. Please connect your wallet to vote.
-                        </p>
-                    </div>
-                ) : isLoadingHasVoted ? (
-                    <Skeleton className="w-full h-20" />
-                ) : hasVoted ? (
-                    <div className="text-center space-y-4">
-                        <p className="text-sm text-muted-foreground">
-                            You have already voted on this proposal.
-                        </p>
-                    </div>
-                ) : (
-                    <>
-                        {/* Chain Selection */}
-                        <div>
-                            <label className="text-sm font-medium mb-2 block">Select Chain</label>
-                            <Select value={selectedChain} onValueChange={setSelectedChain}>
-                                <SelectTrigger className="w-[200px]">
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="main">
-                                        <div className="flex items-center gap-2">
-                                            <div className="w-2 h-2 rounded-full bg-primary" />
-                                            <span>{MAIN_CONFIG.name}</span>
-                                        </div>
-                                    </SelectItem>
-                                    {proposal.secondaryProposals.map((sp) => (
-                                        <SelectItem key={sp.chainName} value={sp.chainName}>
-                                            <div className="flex items-center gap-2">
-                                                <div className="w-2 h-2 rounded-full bg-primary" />
-                                                <span>{sp.chainName}</span>
-                                            </div>
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
+                <div>
+                    <label className="text-sm font-medium mb-2 block">Select Chain</label>
+                    <Select value={selectedChain} onValueChange={setSelectedChain}>
+                        <SelectTrigger className="w-full md:w-[300px]">
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="main">
+                                <div className="flex items-center gap-2">
+                                    <div className="w-2 h-2 rounded-full bg-primary" />
+                                    <span>{MAIN_CONFIG.name}</span>
+                                </div>
+                            </SelectItem>
+                            {proposal.secondaryProposals.map((sp) => (
+                                <SelectItem key={sp.chainName} value={sp.chainName}>
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-2 h-2 rounded-full bg-primary" />
+                                        <span>{sp.chainName}</span>
+                                    </div>
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </div>
 
-                        {/* Vote Selection */}
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium block">Your Vote</label>
-                            <div className="grid grid-cols-2 gap-4">
-                                <Button
-                                    variant={voteType === true ? "success" : "outline"}
-                                    onClick={() => setVoteType(true)}
-                                    className="w-full"
-                                    disabled={!isVotingActive}
-                                >
-                                    For
-                                </Button>
-                                <Button
-                                    variant={voteType === false ? "destructive" : "outline"}
-                                    onClick={() => setVoteType(false)}
-                                    className="w-full"
-                                    disabled={!isVotingActive}
-                                >
-                                    Against
-                                </Button>
-                            </div>
-                        </div>
+                {/* Vote Selection */}
+                <div className="space-y-2">
+                    <label className="text-sm font-medium block">Your Vote</label>
+                    <div className="grid grid-cols-2 gap-4">
+                        <Button
+                            variant={voteType === true ? "success" : "outline"}
+                            onClick={() => setVoteType(true)}
+                            className="w-full"
+                            disabled={!isVotingActive}
+                        >
+                            For
+                        </Button>
+                        <Button
+                            variant={voteType === false ? "destructive" : "outline"}
+                            onClick={() => setVoteType(false)}
+                            className="w-full"
+                            disabled={!isVotingActive}
+                        >
+                            Against
+                        </Button>
+                    </div>
+                </div>
 
-                        {/* Voting Power and Submit */}
-                        <div className="space-y-2">
-                            <div className="flex justify-between text-sm">
-                                <span>Voting Power</span>
-                                {isLoadingVotingPower ? (
-                                    <Skeleton className="w-24 h-3" />
-                                ) : votingPowerError ? (
-                                    <span className="text-destructive">Error loading power</span>
-                                ) : (
-                                    <span>
-                                        {formatTokenAmount(votingPower ?? BigInt(0))} tokens
-                                    </span>
-                                )}
-                            </div>
-                            <Button
-                                className="w-full"
-                                disabled={
-                                    !isVotingActive ||
-                                    voteType === null ||
-                                    isPending ||
-                                    votingPower === BigInt(0)
-                                }
-                                onClick={handleVote}
-                            >
-                                {isPending ? "Submitting..." : "Submit Vote"}
-                            </Button>
-                        </div>
-                    </>
-                )}
+                {/* Voting Power and Submit */}
+                <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                        <span>Voting Power</span>
+                        {isLoadingVotingPower ? (
+                            <Skeleton className="w-24 h-3" />
+                        ) : votingPowerError ? (
+                            <span className="text-destructive">Error loading power</span>
+                        ) : (
+                            <span>{formatTokenAmount(votingPower ?? BigInt(0))} tokens</span>
+                        )}
+                    </div>
+                    <Button className="w-full" disabled={buttonState.disabled} onClick={handleVote}>
+                        {buttonState.text}
+                    </Button>
+                </div>
 
                 {/* Vote Breakdown for All Chains */}
                 <div className="space-y-4">
@@ -168,7 +195,6 @@ export function ChainVoteSection({ proposal, id }: ChainVoteSectionProps) {
                         chainName={`${MAIN_CONFIG.name} (Main)`}
                         yesVotes={BigInt(proposal.mainProposal.yesVotes)}
                         noVotes={BigInt(proposal.mainProposal.noVotes)}
-                        formatTokenAmount={formatTokenAmount}
                     />
                     {proposal.secondaryProposals.map((sp) => (
                         <VoteBreakdown
@@ -176,7 +202,6 @@ export function ChainVoteSection({ proposal, id }: ChainVoteSectionProps) {
                             chainName={sp.chainName}
                             yesVotes={BigInt(sp.proposal.yesVotes)}
                             noVotes={BigInt(sp.proposal.noVotes)}
-                            formatTokenAmount={formatTokenAmount}
                         />
                     ))}
                 </div>
@@ -185,21 +210,24 @@ export function ChainVoteSection({ proposal, id }: ChainVoteSectionProps) {
     );
 }
 
-// Extracted component for vote breakdown to reduce repetition
+// Optimized VoteBreakdown component with memoization
 function VoteBreakdown({
     chainName,
     yesVotes,
     noVotes,
-    formatTokenAmount,
 }: {
     chainName: string;
     yesVotes: bigint;
     noVotes: bigint;
-    formatTokenAmount: (amount: bigint) => string;
 }) {
-    const total = yesVotes + noVotes;
-    const yesPercentage = Number((yesVotes * BigInt(100)) / TOTAL_TOKENS_PER_CHAIN);
-    const noPercentage = Number((noVotes * BigInt(100)) / TOTAL_TOKENS_PER_CHAIN);
+    // Memoize calculations
+    const { total, yesPercentage, noPercentage } = useMemo(() => {
+        const total = yesVotes + noVotes;
+        const yesPercentage = Number((yesVotes * BigInt(100)) / TOTAL_TOKENS_PER_CHAIN);
+        const noPercentage = Number((noVotes * BigInt(100)) / TOTAL_TOKENS_PER_CHAIN);
+
+        return { total, yesPercentage, noPercentage };
+    }, [yesVotes, noVotes]);
 
     return (
         <div className="space-y-2">

@@ -34,7 +34,7 @@ contract SecondaryGovernance is Ownable, ReentrancyGuard {
     }
 
     mapping(bytes32 => Proposal) public proposals;
-    mapping(bytes32 => mapping(address => bool)) public hasVoted;
+    mapping(bytes32 => mapping(address => bool)) hasVoted;
     bytes32[] public proposalIds;
 
     // ===================== Events ===================== //
@@ -63,6 +63,7 @@ contract SecondaryGovernance is Ownable, ReentrancyGuard {
     error VotePeriodEnded(bytes32 proposalId);
     error VoteNotFinalized(bytes32 proposalId);
 
+    // This modifier ensures that only the relayer can call certain functions to prevent unauthorized access
     modifier onlyRelayer() {
         require(msg.sender == relayer, "Only relayer can call");
         _;
@@ -185,7 +186,7 @@ contract SecondaryGovernance is Ownable, ReentrancyGuard {
     }
 
     /// @notice Check if user has voted
-    function hasUserVoted(
+    function hadUserVoted(
         bytes32 proposalId,
         address user
     ) external view returns (bool) {
@@ -200,10 +201,5 @@ contract SecondaryGovernance is Ownable, ReentrancyGuard {
         Proposal storage proposal = proposals[proposalId];
         if (proposal.startTime == 0) revert ProposalNotFound(proposalId);
         return governanceToken.getPastVotes(user, proposal.startTime);
-    }
-
-    /// @notice Get this chain's ID
-    function getChainId() external view returns (string memory) {
-        return chainId;
     }
 }

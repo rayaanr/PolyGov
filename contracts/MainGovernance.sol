@@ -13,8 +13,8 @@ contract MainGovernance is Ownable, ReentrancyGuard {
     ERC20Votes public governanceToken;
     address public relayer;
     uint256 public quorumVotes = 1000 * 10 ** 18;
-    uint256 public constant MIN_CREATION_POWER = 100 * 10 ** 18;
-    uint256 public constant MIN_VOTING_DURATION = 1;
+    uint256 public constant minCreationPower = 100 * 10 ** 18;
+    uint256 public constant minVotingDuration = 1;
     uint256 proposalNonce;
 
     enum ProposalStatus {
@@ -50,13 +50,12 @@ contract MainGovernance is Ownable, ReentrancyGuard {
     }
 
     mapping(bytes32 => Proposal) public proposals;
-    mapping(bytes32 => mapping(address => bool)) public hasVoted;
-    mapping(bytes32 => mapping(string => VoteSummary))
-        public secondaryChainVotes;
+    mapping(bytes32 => mapping(address => bool)) hasVoted;
+    mapping(bytes32 => mapping(string => VoteSummary)) secondaryChainVotes;
     bytes32[] public proposalIds;
 
-    mapping(string => bool) public registeredChains;
-    string[] public chainList;
+    mapping(string => bool) registeredChains;
+    string[] chainList;
 
     // ===================== Events ===================== //
     event ProposalCreated(bytes32 indexed id, string title, uint256 endTime);
@@ -90,6 +89,7 @@ contract MainGovernance is Ownable, ReentrancyGuard {
     error VotesNotCollected(string chainId);
     error ExecutionFailed(address target, uint256 index);
 
+    // This modifier ensures that only the relayer can call certain functions to prevent unauthorized access
     modifier onlyRelayer() {
         require(msg.sender == relayer, "Only relayer can call");
         _;
@@ -102,21 +102,21 @@ contract MainGovernance is Ownable, ReentrancyGuard {
         relayer = _relayer;
     }
 
-    /// @notice Update the trusted relayer address
+    /// @notice Update the trusted relayer address (only for admin)
     function updateRelayer(address _newRelayer) external onlyOwner {
         require(_newRelayer != address(0), "Invalid relayer address");
         relayer = _newRelayer;
         emit RelayerUpdated(_newRelayer);
     }
 
-    /// @notice Update the quorum threshold
+    /// @notice Update the quorum threshold (only for admin)
     function updateQuorum(uint256 _newQuorum) external onlyOwner {
         require(_newQuorum > 0, "Quorum must be positive");
         quorumVotes = _newQuorum;
         emit QuorumUpdated(_newQuorum);
     }
 
-    /// @notice Register a new secondary chain
+    /// @notice Register a new secondary chain (only for admin)
     function addSecondaryChain(string memory chainId) external onlyOwner {
         require(!registeredChains[chainId], "Chain already registered");
         registeredChains[chainId] = true;
@@ -124,7 +124,7 @@ contract MainGovernance is Ownable, ReentrancyGuard {
         emit ChainRegistered(chainId);
     }
 
-    /// @notice Create a new proposal
+    /// @notice Create a new proposal (anyone with sufficient voting power)
     function createProposal(
         string memory _title,
         string memory _ipfsHash,
@@ -133,7 +133,7 @@ contract MainGovernance is Ownable, ReentrancyGuard {
         uint256[] memory _values,
         bytes[] memory _calldatas
     ) external {
-        require(_durationMinutes > MIN_VOTING_DURATION, "Duration too short");
+        require(_durationMinutes > minVotingDuration, "Duration too short");
         require(
             _targets.length == _values.length &&
                 _targets.length == _calldatas.length,
@@ -141,7 +141,7 @@ contract MainGovernance is Ownable, ReentrancyGuard {
         );
 
         uint256 votingPower = governanceToken.getVotes(msg.sender);
-        require(votingPower >= MIN_CREATION_POWER, "Insufficient voting power");
+        require(votingPower >= minCreationPower, "Insufficient voting power");
 
         proposalNonce++;
         bytes32 proposalId = keccak256(
@@ -187,7 +187,7 @@ contract MainGovernance is Ownable, ReentrancyGuard {
         emit Voted(proposalId, msg.sender, support, votingPower);
     }
 
-    /// @notice Called by relayer to submit secondary chain votes
+    /// @notice Called by relayer to submit secondary chain votes (only for relayer)
     function collectSecondaryChainVotes(
         bytes32 proposalId,
         string memory chainId,
@@ -218,7 +218,7 @@ contract MainGovernance is Ownable, ReentrancyGuard {
         );
     }
 
-    /// @notice Finalize a proposal by aggregating all chain votes and applying quorum
+    /// @notice Finalize a proposal by aggregating all chain votes and applying quorum (anyone)
     function finalizeProposalVotes(bytes32 proposalId) external nonReentrant {
         Proposal storage proposal = proposals[proposalId];
         if (proposal.startTime == 0) revert ProposalNotFound(proposalId);
@@ -258,7 +258,7 @@ contract MainGovernance is Ownable, ReentrancyGuard {
         emit VoteTallyFinalized(proposalId, totalYesVotes, totalNoVotes);
     }
 
-    /// @notice Execute an accepted proposal
+    /// @notice Execute an accepted proposal (anyone)
     function executeProposal(bytes32 proposalId) external nonReentrant {
         Proposal storage proposal = proposals[proposalId];
         if (!proposal.voteTallyFinalized) revert("Votes not finalized");
@@ -315,5 +315,27 @@ contract MainGovernance is Ownable, ReentrancyGuard {
 
     function getRegisteredChains() external view returns (string[] memory) {
         return chainList;
+    }
+
+    function getSecondaryChainVotes(
+        bytes32 proposalId,
+        string memory chainId
+    ) external view returns (VoteSummary memory) {
+        return secondaryChainVotes[proposalId][chainId];
+    }
+
+    /// @notice Delete a proposal (only for admin)
+    /// @dev This function is not intended for production use and should be removed in a live environment
+    function deleteProposal(
+        bytes32 proposalId
+    ) external onlyOwner nonReentrant {
+        delete proposals[proposalId];
+        for (uint256 i = 0; i < proposalIds.length; i++) {
+            if (proposalIds[i] == proposalId) {
+                proposalIds[i] = proposalIds[proposalIds.length - 1];
+                proposalIds.pop();
+                break;
+            }
+        }
     }
 }
