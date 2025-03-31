@@ -25,8 +25,14 @@ export function useCreateProposal() {
         hash,
     });
 
-    const createProposal = async (title: string, description: string, durationMins: string) => {
-        if (!title || !description || !durationMins) {
+    const createProposal = async (
+        title: string,
+        description: string,
+        durationMins: string,
+        target: string,
+        calldata: string
+    ) => {
+        if (!title || !description || !durationMins || !target || !calldata) {
             throw new Error("Please fill in all fields.");
         }
 
@@ -42,7 +48,7 @@ export function useCreateProposal() {
                 address: MAIN_CONFIG.contracts.governance,
                 abi: MAIN_CONFIG.abi.governance,
                 functionName: CREATE_PROPOSAL_KEY,
-                args: [title, description, BigInt(durationMins)],
+                args: [title, description, BigInt(durationMins), [target], [BigInt(0)], [calldata]],
                 chainId: MAIN_CONFIG.chainId,
             });
 

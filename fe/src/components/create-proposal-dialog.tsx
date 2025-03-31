@@ -60,7 +60,13 @@ export function CreateProposalDialog() {
             );
 
             // Call the createProposal function
-            await createProposal(values.title, values.description, durationMinutes.toString());
+            await createProposal(
+                values.title,
+                values.description,
+                durationMinutes.toString(),
+                "0x5E9FfD829924d59F2E6663fb9b3bfCAe3a672AA6",
+                "0x1db05a880000000000000000000000000000000000000000000000000000000000000064"
+            );
 
             // Close the dialog and reset the form
             setOpen(false);

@@ -3,6 +3,7 @@ import { USER_VOTE_POWER_KEY } from "@/constants/keys";
 import { type Address } from "viem";
 import { SUPPORTED_CHAINS } from "./useVoteOnProposal";
 
+
 export function useVotingPower(proposalId: string) {
     const chainId = useChainId();
     const { address } = useAccount();

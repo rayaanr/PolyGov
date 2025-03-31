@@ -6,10 +6,9 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { CalendarIcon, Clock } from "lucide-react";
-import { format } from "date-fns";
 import { ProposalDetailSkeleton } from "@/components/proposal-detail-skeleton";
 import useProposalById from "@/hooks/useProposalById";
-import { getBadgeVariant, getStatusText } from "@/lib/utils";
+import { formatDate, getBadgeVariant, getStatusText } from "@/lib/utils";
 import useVoteStats from "@/hooks/useVoteStats";
 import { TOTAL_VOTING_POWER } from "@/constants/const";
 
@@ -39,29 +38,19 @@ export default function ProposalDetails({ id }: { id: string }) {
                 <div>
                     <h1 className="text-2xl font-medium">{proposal.mainProposal.title}</h1>
                     <p className="text-sm text-muted-foreground mt-2">
-                        {proposal.mainProposal.description}
+                        {proposal.mainProposal.ipfsHash}
                     </p>
 
                     <div className="flex flex-wrap gap-4 mt-4">
                         <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
                             <CalendarIcon className="h-4 w-4" />
                             <span>
-                                Start:{" "}
-                                {format(
-                                    new Date(Number(proposal.mainProposal.startTime)),
-                                    "MMM d, yyyy"
-                                )}
+                                Start: {formatDate(Number(proposal.mainProposal.startTime))}
                             </span>
                         </div>
                         <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
                             <Clock className="h-4 w-4" />
-                            <span>
-                                End:{" "}
-                                {format(
-                                    new Date(Number(proposal.mainProposal.endTime)),
-                                    "MMM d, yyyy"
-                                )}
-                            </span>
+                            <span>End: {formatDate(Number(proposal.mainProposal.endTime))}</span>
                         </div>
                     </div>
                 </div>

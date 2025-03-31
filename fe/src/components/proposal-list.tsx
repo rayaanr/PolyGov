@@ -3,15 +3,14 @@ import { CombinedProposal } from "@/lib/types";
 import Link from "next/link";
 import React from "react";
 import { Badge } from "./ui/badge";
-import { getBadgeVariant, getStatusText } from "@/lib/utils";
+import { formatDate, getBadgeVariant, getStatusText } from "@/lib/utils";
 import { Progress } from "./ui/progress";
-import { MAIN_CONFIG } from "@/constants/config";
+import CONFIG, { MAIN_CONFIG } from "@/constants/config";
 import useProposals from "@/hooks/useProposals";
 import { ProposalSkeleton } from "./proposal-skeleton";
 import Image from "next/image";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "./ui/card";
 import { CalendarIcon, Clock } from "lucide-react";
-import { format } from "date-fns";
 
 export function ProposalList() {
     const { combinedProposals, isLoading, error, totalCount } = useProposals();
@@ -70,7 +69,7 @@ function ProposalCard({ proposal }: { proposal: CombinedProposal }) {
                                 {mainProposal.title}
                             </CardTitle>
                             <CardDescription className="line-clamp-2 mt-1 text-xs h-8">
-                                {mainProposal.description}
+                                {mainProposal.ipfsHash}
                             </CardDescription>
                         </div>
                         <Badge
@@ -93,7 +92,10 @@ function ProposalCard({ proposal }: { proposal: CombinedProposal }) {
                         {secondaryProposals.map(({ chainName }) => (
                             <ChainBadge
                                 key={chainName}
-                                icon={chainName === "Arbitrum Sepolia" ? "/arb.png" : ""}
+                                icon={
+                                    CONFIG.SECONDARY_CHAINS.find((c) => c.name === chainName)
+                                        ?.icon || ""
+                                }
                                 chainName={chainName}
                             />
                         ))}
@@ -102,15 +104,11 @@ function ProposalCard({ proposal }: { proposal: CombinedProposal }) {
                 <CardFooter className="pt-2 pb-3 border-t border-border flex justify-between">
                     <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                         <CalendarIcon className="size-3" />
-                        <span>
-                            Start: {format(new Date(Number(mainProposal.startTime)), "MMM d, yyyy")}
-                        </span>
+                        <span>Start: {formatDate(Number(mainProposal.startTime))}</span>
                     </div>
                     <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                         <Clock className="size-3" />
-                        <span>
-                            End: {format(new Date(Number(mainProposal.endTime)), "MMM d, yyyy")}
-                        </span>
+                        <span>End: {formatDate(Number(mainProposal.endTime))}</span>
                     </div>
                 </CardFooter>
             </Card>

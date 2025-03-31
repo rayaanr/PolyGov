@@ -45,30 +45,32 @@ enum ProposalStatusEnum {
 
 // Main proposal details
 export interface ProposalDetails {
-    proposalId: string;
+    id: string;
     title: string;
-    description: string;
+    ipfsHash: string;
     yesVotes: bigint;
     noVotes: bigint;
     startTime: bigint;
     endTime: bigint;
+    proposer: string;
     status: ProposalStatusEnum;
     finalYesVotes: bigint;
     finalNoVotes: bigint;
     voteTallyFinalized: boolean;
+    executed: boolean;
 }
 
 // Secondary proposal details
 export interface SecondaryProposalDetails {
-    proposalId: string;
+    id: string;
     title: string;
-    description: string;
+    ipfsHash: string;
     yesVotes: bigint;
     noVotes: bigint;
     startTime: bigint;
     endTime: bigint;
     status: ProposalStatusEnum;
-    voteTallied: boolean;
+    voteFinalized: boolean;
 }
 
 // Types

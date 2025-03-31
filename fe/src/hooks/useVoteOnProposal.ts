@@ -7,8 +7,8 @@ import { VOTE_KEY } from "@/constants/keys";
 import { type Address, type Hash } from "viem";
 
 export const SUPPORTED_CHAINS: Record<number, { chain: Chain; config: any }> = {
-    [bscTestnet.id]: { chain: bscTestnet, config: MAIN_CONFIG },
-    [arbitrumSepolia.id]: { chain: arbitrumSepolia, config: CONFIG.SECONDARY_CHAINS[0] },
+    [bscTestnet.id]: { chain: bscTestnet, config: CONFIG.SECONDARY_CHAINS[0] },
+    [arbitrumSepolia.id]: { chain: arbitrumSepolia, config:  MAIN_CONFIG },
 };
 
 export function useVoteOnProposal() {

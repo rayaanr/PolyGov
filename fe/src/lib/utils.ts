@@ -1,4 +1,5 @@
 import { clsx, type ClassValue } from "clsx";
+import { format } from "date-fns";
 import { twMerge } from "tailwind-merge";
 
 export function cn(...inputs: ClassValue[]) {
@@ -10,7 +11,7 @@ export function formatVotes(votes: bigint): string {
 }
 
 export function formatDate(date: number): string {
-    return new Date(date * 1000).toLocaleString();
+    return format(new Date(date * 1000), "MMM d, yyyy HH:mm");
 }
 
 const STATUS_MAP: Record<number, string> = {

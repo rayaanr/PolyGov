@@ -10,7 +10,7 @@ import {
 
 // Type guard to check if a proposal is a SecondaryProposalDetails
 export function isSecondaryProposalDetails(proposal: any): proposal is SecondaryProposalDetails {
-    return proposal && typeof proposal === "object" && "voteTallied" in proposal;
+    return proposal && typeof proposal === "object" && "voteFinalized" in proposal;
 }
 
 // Type guard to check if a proposal is a ProposalDetails
