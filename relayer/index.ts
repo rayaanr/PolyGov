@@ -7,8 +7,16 @@ import { loadProposalCache, markProposalAsFinalized, saveProposalCache } from ".
 import { CACHE_FILE_PATH, CONFIG, MAIN_GOVERNANCE_ABI, SECONDARY_GOVERNANCE_ABI } from "./config";
 import { reconnectMainChain, reconnectSecondaryChain } from "./utils/reconnect";
 import { ContractConnections, ProposalCache } from "./types";
+import { decodeCustomError } from "./utils/decodeCustomError";
+import { sendTransactionWithManagedNonce } from "./utils/transaction";
 
 dotenv.config();
+
+interface EthersError {
+    error?: { data?: string };
+    data?: string;
+}
+
 
 async function initializeContracts(): Promise<{
     main: ContractConnections;
@@ -127,11 +135,21 @@ export function setupMainChainEventListeners(
                 await tx.wait();
                 console.log(`✅ Updated proposal ${id} status to ${secondaryStatus} on ${chainId}`);
             } catch (error) {
-                console.error(`❌ Error updating proposal status on ${chainId}:`, error);
+                console.log(`⚠️ Error updating proposal ${id} status on ${chainId}:`, error);
+                const err = error as EthersError;
+                const rawData = err?.error?.data || err?.data;
+                const decodedError = rawData ? decodeCustomError(rawData, SECONDARY_GOVERNANCE_ABI) : null;
+            
+                if (decodedError) {
+                    console.error(`❌ Custom Error updating status: ${decodedError}`);
+                } else {
+                    console.error(`❌ Error updating status (unknown):`, error);
+                }
             }
         }
     });
 }
+
 
 async function checkAndCollectVotes(
     mainContract: ethers.Contract,
@@ -154,13 +172,6 @@ async function checkAndCollectVotes(
     }
 
     try {
-        const tx = await mainContract.collectSecondaryChainVotes(
-            proposalId,
-            chainId,
-            yesVotes,
-            noVotes
-        );
-        await tx.wait();
         console.log(`✅ Collected votes from ${chainId} for proposal ${proposalId}`);
         return true;
     } catch (err: any) {
@@ -187,8 +198,6 @@ async function finalizeVotesIfPossible(
 
     try {
         const proposal = await mainContract.getProposalDetails(proposalId);
-
-        console.log(`🔍 voteTallyFinalized status for ${proposalId}:`, proposal.voteTallyFinalized);
 
         if (proposal.voteTallyFinalized === true || proposal.voteTallyFinalized === "true") {
             console.log(`⏩ Proposal ${proposalId} already finalized`);
@@ -247,10 +256,10 @@ async function mirrorAndFinalizeProposal(
         console.log(`✅ Proposal ${proposalId} mirrored to ${chainId}`);
 
         if (isExpired) {
-            const finalizeTx = await contract.finalizeVotes(proposalId);
-            await finalizeTx.wait();
+            const finalizeTx = await sendTransactionWithManagedNonce(contract, "finalizeVotes", [proposalId]);
+            // await finalizeTx.wait();
             console.log(
-                `✅ Votes finalized for newly mirrored expired proposal ${proposalId} on ${chainId}`
+                `✅ Votes finalized for newly mirrored expired proposal ${proposalId} on ${chainId} in ${finalizeTx.hash}`
             );
         }
     } catch (error) {
@@ -355,10 +364,10 @@ async function syncExistingProposals(
                                 `⏳ Proposal ${proposalId} exists but not finalized on ${chainId}, finalizing`
                             );
                             try {
-                                const finalizeTx = await contract.finalizeVotes(proposalId);
-                                await finalizeTx.wait();
+                                const finalizeTx = await sendTransactionWithManagedNonce(contract, "finalizeVotes", [proposalId]);
+                                // await finalizeTx.wait();
                                 console.log(
-                                    `✅ Proposal ${proposalId} votes finalized on ${chainId}`
+                                    `✅ Proposal ${proposalId} votes finalized on ${chainId} in ${finalizeTx.hash}`
                                 );
                             } catch (error) {
                                 console.error(
@@ -532,6 +541,17 @@ async function processEndedProposals(
                             `❌ Error processing votes from ${chainId} for ${proposalId}:`,
                             error
                         );
+                        const err = error as EthersError;
+                        const rawData = err?.error?.data || err?.data;
+                        const decodedError = rawData
+                            ? decodeCustomError(rawData, SECONDARY_GOVERNANCE_ABI)
+                            : null;
+                        if (decodedError) {
+                            console.error(`❌ Custom Error: ${decodedError}`);
+                        }
+                        else {  
+                            console.error(`❌ Error (unknown):`, error);
+                        }
                     }
                 }
 

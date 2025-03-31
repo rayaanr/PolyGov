@@ -14,7 +14,7 @@ contract MainGovernance is Ownable, ReentrancyGuard {
     address public relayer;
     uint256 public quorumVotes = 1000 * 10 ** 18;
     uint256 public constant MIN_CREATION_POWER = 100 * 10 ** 18;
-    uint256 public constant MIN_VOTING_DURATION = 5;
+    uint256 public constant MIN_VOTING_DURATION = 1;
     uint256 proposalNonce;
 
     enum ProposalStatus {
@@ -32,7 +32,7 @@ contract MainGovernance is Ownable, ReentrancyGuard {
         uint256 noVotes;
         uint256 startTime;
         uint256 endTime;
-        address proposer; 
+        address proposer;
         ProposalStatus status;
         uint256 finalYesVotes;
         uint256 finalNoVotes;
@@ -245,7 +245,10 @@ contract MainGovernance is Ownable, ReentrancyGuard {
 
         uint256 totalVotes = totalYesVotes + totalNoVotes;
         if (totalVotes < quorumVotes) {
-            revert QuorumNotReached(totalVotes, quorumVotes);
+            proposal.voteTallyFinalized = true;
+            proposal.status = ProposalStatus.Rejected;
+            emit VoteTallyFinalized(proposalId, totalYesVotes, totalNoVotes);
+            return;
         }
 
         proposal.finalYesVotes = totalYesVotes;

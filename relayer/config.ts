@@ -10,7 +10,7 @@ export const CONFIG = {
         CHAIN_ID: "main",
         RPC_URL: process.env.ARB_RPC || "",
         WS_URL: process.env.ARB_WS_URL || "",
-        CONTRACT: "0x9C9047b0aDBBBd11E6dcc654ad8F275854E896Ac",
+        CONTRACT: "0x6843a77F821a80D71Ac994c5288A2a061ec77d53",
     },
     SECONDARY_CHAINS: [
         {
