@@ -27,4 +27,4 @@ wallets.json
 
 /constants/accounts.ts
 
-/relayer/proposal_cache.json
+/relayer/utils/proposal_cache.json
