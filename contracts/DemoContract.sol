@@ -2,19 +2,19 @@
 pragma solidity ^0.8.28;
 
 /**
- * @title SimpleCounter
- * @dev A simple contract to simulate governance execution
+ * @title DemoContract
+ * @dev A simple contract to demonstrate governance execution with a string value
  */
-contract SimpleCounter {
-    uint256 public number;
+contract DemoContract {
+    string public value;
     address public lastUpdater;
 
-    event NumberUpdated(uint256 newValue, address updater);
+    event ValueUpdated(string newValue, address updater);  // Updated event to reflect string
 
-    // @notice An example function that updates the number and emits an event 
-    function updateNumber(uint256 newValue) external {
-        number = newValue;
+    // @notice An example function that updates the value and emits an event 
+    function updateValue(string calldata newValue) external {
+        value = newValue;
         lastUpdater = msg.sender;
-        emit NumberUpdated(newValue, msg.sender);
+        emit ValueUpdated(newValue, msg.sender);  // Emit the updated value as a string
     }
 }

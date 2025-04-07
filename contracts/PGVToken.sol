@@ -12,8 +12,11 @@ import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Votes.sol";
 contract PGVToken is ERC20, ERC20Permit, ERC20Votes {
     uint256 public constant MAX_SUPPLY = 10000 * 10 ** 18; // 10,000 tokens
 
-    constructor() ERC20("PGV Governance Token", "PGV") ERC20Permit(name) {
-        _mint(msg.sender, initialSupply);
+    // Custom error for clock inconsistency
+    error ERC6372InconsistentClock();
+
+    constructor() ERC20("PolyGov Token", "PGV") ERC20Permit(name()) {
+        _mint(msg.sender, MAX_SUPPLY);
     }
 
     // The following functions are overrides required by Solidity.
@@ -30,18 +33,14 @@ contract PGVToken is ERC20, ERC20Permit, ERC20Votes {
         }
     }
 
-    // clokc() & CLOCK_MODE() are needs to be modified like this according to https://github.com/OpenZeppelin/openzeppelin-contracts/blob/fda6b85f2c65d146b86d513a604554d15abd6679/contracts/governance/utils/Votes.sol#L54-L57
+    // clock() & CLOCK_MODE() needs to be modified like this according to https://github.com/OpenZeppelin/openzeppelin-contracts/blob/fda6b85f2c65d146b86d513a604554d15abd6679/contracts/governance/utils/Votes.sol#L54-L57
 
-    // Override clock on snapshot from block number to block timestamp which is nessary for MultiChain proposal support
+    // Override clock on snapshot from block number to block timestamp which is necessary for MultiChain proposal support
     function clock() public view override returns (uint48) {
         return uint48(block.timestamp);
     }
 
-    function CLOCK_MODE() public view override returns (string memory) {
-        if (clock() != block.timestamp) {
-            revert ERC6372InconsistentClock();
-        }
-
+    function CLOCK_MODE() public pure override returns (string memory) {
         return "mode=blocktimestamp&from=default";
     }
 

@@ -22,13 +22,13 @@ contract SecondaryGovernance is Ownable, ReentrancyGuard {
 
     struct Proposal {
         bytes32 id;
-        string title;
-        string ipfsHash;
+        string title;   // Can be removed (used in Main chain), kept here for easier testing.
+        string ipfsHash;   // Can be removed (used in Main chain), kept here for easier testing.
         uint256 yesVotes;
         uint256 noVotes;
         uint256 startTime;
         uint256 endTime;
-        address proposer;
+        address proposer;  
         ProposalStatus status;
         bool voteFinalized;
     }
