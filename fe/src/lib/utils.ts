@@ -1,7 +1,7 @@
 import { clsx, type ClassValue } from "clsx";
 import { format } from "date-fns";
 import { twMerge } from "tailwind-merge";
-import { Interface } from "ethers";
+import { encodeFunctionData } from "viem";
 
 export function cn(...inputs: ClassValue[]) {
     return twMerge(clsx(inputs));
@@ -44,9 +44,17 @@ export const getBadgeVariant = (status: number): BadgeVariant => {
     return BADGE_VARIANTS[statusText as keyof typeof BADGE_VARIANTS] ?? "secondary";
 };
 
+import { Interface } from "ethers";
+
+// export function encodeUpdateValueCalldata(title: string) {
+//     const abi = ["function updateValue(string newValue)"];
+//     const iface = new Interface(abi);
+//     const calldata = iface.encodeFunctionData("updateValue", [title]);
+//     return calldata;
+// }
+
 export function encodeUpdateValueCalldata(title: string) {
     const abi = ["function updateValue(string newValue)"];
-    const iface = new Interface(abi);
-    const calldata = iface.encodeFunctionData("updateValue", [title]);
+    const calldata = encodeFunctionData({ abi, functionName: "updateValue", args: [title] });
     return calldata;
 }
