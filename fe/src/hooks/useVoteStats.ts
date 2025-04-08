@@ -1,4 +1,4 @@
-import { TOTAL_VOTING_POWER, VOTE_DIVISOR } from "@/constants/const";
+import { TOTAL_VOTING_POWER } from "@/constants/const";
 import { ProposalDetails, SecondaryProposal } from "@/lib/types";
 
 interface VoteStats {
