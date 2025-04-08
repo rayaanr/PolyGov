@@ -153,7 +153,7 @@ async function checkAndCollectVotes(
     noVotes: bigint
 ): Promise<boolean> {
     try {
-        const secondaryVotes = await mainContract.secondaryChainVotes(proposalId, chainId);
+        const secondaryVotes = await mainContract.getSecondaryChainVotes(proposalId, chainId);
         if (secondaryVotes.collected) {
             console.log(`ℹ️ Votes already collected from ${chainId} for proposal ${proposalId}`);
             return true;
@@ -201,7 +201,7 @@ async function finalizeVotesIfPossible(
 
         const registeredChains = await mainContract.getRegisteredChains();
         for (const chainId of registeredChains) {
-            const votes = await mainContract.secondaryChainVotes(proposalId, chainId);
+            const votes = await mainContract.getSecondaryChainVotes(proposalId, chainId);
             if (!votes.collected) {
                 console.log(`⏩ Skipping finalization: votes from ${chainId} not collected yet`);
                 return;
@@ -468,7 +468,7 @@ async function processEndedProposals(
                         // Check if votes are already collected before proceeding
                         let votesCollected = false;
                         try {
-                            const secondaryVotes = await mainContract.secondaryChainVotes(
+                            const secondaryVotes = await mainContract.getSecondaryChainVotes(
                                 proposalId,
                                 chainId
                             );

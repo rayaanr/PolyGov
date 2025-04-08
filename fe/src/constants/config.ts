@@ -26,8 +26,8 @@ const CONFIG: {
         chainId: arbitrumSepolia.id,
         explorerUrl: arbitrumSepolia.blockExplorers?.default.url,
         contracts: {
-            token: "0x4F90cb1474bF846682B267e62cEA52505477B378",
-            governance: "0x6843a77F821a80D71Ac994c5288A2a061ec77d53",
+            token: "0xc359f38eD76d8941d486dA85a4aA553Aa74b18BD",
+            governance: "0x8Dfdc3D4837aa7cB73B664536Fb0557Af7C82c5d",
         },
         abi: {
             governance: mainABI as Abi,
@@ -40,8 +40,8 @@ const CONFIG: {
             chainId: bscTestnet.id,
             explorerUrl: bscTestnet.blockExplorers?.default.url,
             contracts: {
-                token: "0x22f17c601b36bb193aca3585F14a6345A979219d",
-                governance: "0x402BD069C8a175f083025b10C56791340296CC6A",
+                token: "0xc359f38eD76d8941d486dA85a4aA553Aa74b18BD",
+                governance: "0x8Dfdc3D4837aa7cB73B664536Fb0557Af7C82c5d",
             },
             abi: {
                 governance: arbABI as Abi,

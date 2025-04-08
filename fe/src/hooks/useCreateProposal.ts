@@ -65,7 +65,6 @@ export function useCreateProposal() {
         setIsSuccess(true);
         reset();
         toast.success("Proposal created successfully!", {
-            description: `Transaction hash: ${hash}`,
             action: {
                 label: "View on Explorer",
                 onClick: () => {

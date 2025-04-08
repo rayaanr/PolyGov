@@ -158,20 +158,6 @@
         "type": "event"
     },
     {
-        "inputs": [],
-        "name": "MIN_CREATION_POWER",
-        "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
-        "stateMutability": "view",
-        "type": "function"
-    },
-    {
-        "inputs": [],
-        "name": "MIN_VOTING_DURATION",
-        "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
-        "stateMutability": "view",
-        "type": "function"
-    },
-    {
         "inputs": [{ "internalType": "string", "name": "chainId", "type": "string" }],
         "name": "addSecondaryChain",
         "outputs": [],
@@ -186,13 +172,6 @@
         "name": "castVote",
         "outputs": [],
         "stateMutability": "nonpayable",
-        "type": "function"
-    },
-    {
-        "inputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
-        "name": "chainList",
-        "outputs": [{ "internalType": "string", "name": "", "type": "string" }],
-        "stateMutability": "view",
         "type": "function"
     },
     {
@@ -217,6 +196,13 @@
             { "internalType": "bytes[]", "name": "_calldatas", "type": "bytes[]" }
         ],
         "name": "createProposal",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [{ "internalType": "bytes32", "name": "proposalId", "type": "bytes32" }],
+        "name": "deleteProposal",
         "outputs": [],
         "stateMutability": "nonpayable",
         "type": "function"
@@ -287,6 +273,27 @@
     {
         "inputs": [
             { "internalType": "bytes32", "name": "proposalId", "type": "bytes32" },
+            { "internalType": "string", "name": "chainId", "type": "string" }
+        ],
+        "name": "getSecondaryChainVotes",
+        "outputs": [
+            {
+                "components": [
+                    { "internalType": "uint256", "name": "yesVotes", "type": "uint256" },
+                    { "internalType": "uint256", "name": "noVotes", "type": "uint256" },
+                    { "internalType": "bool", "name": "collected", "type": "bool" }
+                ],
+                "internalType": "struct MainGovernance.VoteSummary",
+                "name": "",
+                "type": "tuple"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            { "internalType": "bytes32", "name": "proposalId", "type": "bytes32" },
             { "internalType": "address", "name": "user", "type": "address" }
         ],
         "name": "getUserVotingPowerAtProposal",
@@ -312,12 +319,16 @@
         "type": "function"
     },
     {
-        "inputs": [
-            { "internalType": "bytes32", "name": "", "type": "bytes32" },
-            { "internalType": "address", "name": "", "type": "address" }
-        ],
-        "name": "hasVoted",
-        "outputs": [{ "internalType": "bool", "name": "", "type": "bool" }],
+        "inputs": [],
+        "name": "minCreationPower",
+        "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "minVotingDuration",
+        "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
         "stateMutability": "view",
         "type": "function"
     },
@@ -368,13 +379,6 @@
         "type": "function"
     },
     {
-        "inputs": [{ "internalType": "string", "name": "", "type": "string" }],
-        "name": "registeredChains",
-        "outputs": [{ "internalType": "bool", "name": "", "type": "bool" }],
-        "stateMutability": "view",
-        "type": "function"
-    },
-    {
         "inputs": [],
         "name": "relayer",
         "outputs": [{ "internalType": "address", "name": "", "type": "address" }],
@@ -386,20 +390,6 @@
         "name": "renounceOwnership",
         "outputs": [],
         "stateMutability": "nonpayable",
-        "type": "function"
-    },
-    {
-        "inputs": [
-            { "internalType": "bytes32", "name": "", "type": "bytes32" },
-            { "internalType": "string", "name": "", "type": "string" }
-        ],
-        "name": "secondaryChainVotes",
-        "outputs": [
-            { "internalType": "uint256", "name": "yesVotes", "type": "uint256" },
-            { "internalType": "uint256", "name": "noVotes", "type": "uint256" },
-            { "internalType": "bool", "name": "collected", "type": "bool" }
-        ],
-        "stateMutability": "view",
         "type": "function"
     },
     {

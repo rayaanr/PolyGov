@@ -49,12 +49,7 @@ export const arbABI = [
     {
         anonymous: false,
         inputs: [
-            {
-                indexed: true,
-                internalType: "address",
-                name: "previousOwner",
-                type: "address",
-            },
+            { indexed: true, internalType: "address", name: "previousOwner", type: "address" },
             { indexed: true, internalType: "address", name: "newOwner", type: "address" },
         ],
         name: "OwnershipTransferred",
@@ -136,13 +131,6 @@ export const arbABI = [
         type: "function",
     },
     {
-        inputs: [],
-        name: "getChainId",
-        outputs: [{ internalType: "string", name: "", type: "string" }],
-        stateMutability: "view",
-        type: "function",
-    },
-    {
         inputs: [{ internalType: "bytes32", name: "proposalId", type: "bytes32" }],
         name: "getProposalDetails",
         outputs: [
@@ -200,17 +188,7 @@ export const arbABI = [
             { internalType: "bytes32", name: "proposalId", type: "bytes32" },
             { internalType: "address", name: "user", type: "address" },
         ],
-        name: "hasUserVoted",
-        outputs: [{ internalType: "bool", name: "", type: "bool" }],
-        stateMutability: "view",
-        type: "function",
-    },
-    {
-        inputs: [
-            { internalType: "bytes32", name: "", type: "bytes32" },
-            { internalType: "address", name: "", type: "address" },
-        ],
-        name: "hasVoted",
+        name: "hadUserVoted",
         outputs: [{ internalType: "bool", name: "", type: "bool" }],
         stateMutability: "view",
         type: "function",

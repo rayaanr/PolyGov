@@ -62,12 +62,7 @@ export const mainABI = [
     {
         anonymous: false,
         inputs: [
-            {
-                indexed: true,
-                internalType: "address",
-                name: "previousOwner",
-                type: "address",
-            },
+            { indexed: true, internalType: "address", name: "previousOwner", type: "address" },
             { indexed: true, internalType: "address", name: "newOwner", type: "address" },
         ],
         name: "OwnershipTransferred",
@@ -124,18 +119,8 @@ export const mainABI = [
         anonymous: false,
         inputs: [
             { indexed: true, internalType: "bytes32", name: "id", type: "bytes32" },
-            {
-                indexed: false,
-                internalType: "uint256",
-                name: "totalYesVotes",
-                type: "uint256",
-            },
-            {
-                indexed: false,
-                internalType: "uint256",
-                name: "totalNoVotes",
-                type: "uint256",
-            },
+            { indexed: false, internalType: "uint256", name: "totalYesVotes", type: "uint256" },
+            { indexed: false, internalType: "uint256", name: "totalNoVotes", type: "uint256" },
         ],
         name: "VoteTallyFinalized",
         type: "event",
@@ -152,20 +137,6 @@ export const mainABI = [
         type: "event",
     },
     {
-        inputs: [],
-        name: "MIN_CREATION_POWER",
-        outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
-        stateMutability: "view",
-        type: "function",
-    },
-    {
-        inputs: [],
-        name: "MIN_VOTING_DURATION",
-        outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
-        stateMutability: "view",
-        type: "function",
-    },
-    {
         inputs: [{ internalType: "string", name: "chainId", type: "string" }],
         name: "addSecondaryChain",
         outputs: [],
@@ -180,13 +151,6 @@ export const mainABI = [
         name: "castVote",
         outputs: [],
         stateMutability: "nonpayable",
-        type: "function",
-    },
-    {
-        inputs: [{ internalType: "uint256", name: "", type: "uint256" }],
-        name: "chainList",
-        outputs: [{ internalType: "string", name: "", type: "string" }],
-        stateMutability: "view",
         type: "function",
     },
     {
@@ -211,6 +175,13 @@ export const mainABI = [
             { internalType: "bytes[]", name: "_calldatas", type: "bytes[]" },
         ],
         name: "createProposal",
+        outputs: [],
+        stateMutability: "nonpayable",
+        type: "function",
+    },
+    {
+        inputs: [{ internalType: "bytes32", name: "proposalId", type: "bytes32" }],
+        name: "deleteProposal",
         outputs: [],
         stateMutability: "nonpayable",
         type: "function",
@@ -281,6 +252,27 @@ export const mainABI = [
     {
         inputs: [
             { internalType: "bytes32", name: "proposalId", type: "bytes32" },
+            { internalType: "string", name: "chainId", type: "string" },
+        ],
+        name: "getSecondaryChainVotes",
+        outputs: [
+            {
+                components: [
+                    { internalType: "uint256", name: "yesVotes", type: "uint256" },
+                    { internalType: "uint256", name: "noVotes", type: "uint256" },
+                    { internalType: "bool", name: "collected", type: "bool" },
+                ],
+                internalType: "struct MainGovernance.VoteSummary",
+                name: "",
+                type: "tuple",
+            },
+        ],
+        stateMutability: "view",
+        type: "function",
+    },
+    {
+        inputs: [
+            { internalType: "bytes32", name: "proposalId", type: "bytes32" },
             { internalType: "address", name: "user", type: "address" },
         ],
         name: "getUserVotingPowerAtProposal",
@@ -306,12 +298,16 @@ export const mainABI = [
         type: "function",
     },
     {
-        inputs: [
-            { internalType: "bytes32", name: "", type: "bytes32" },
-            { internalType: "address", name: "", type: "address" },
-        ],
-        name: "hasVoted",
-        outputs: [{ internalType: "bool", name: "", type: "bool" }],
+        inputs: [],
+        name: "minCreationPower",
+        outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
+        stateMutability: "view",
+        type: "function",
+    },
+    {
+        inputs: [],
+        name: "minVotingDuration",
+        outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
         stateMutability: "view",
         type: "function",
     },
@@ -341,11 +337,7 @@ export const mainABI = [
             { internalType: "uint256", name: "startTime", type: "uint256" },
             { internalType: "uint256", name: "endTime", type: "uint256" },
             { internalType: "address", name: "proposer", type: "address" },
-            {
-                internalType: "enum MainGovernance.ProposalStatus",
-                name: "status",
-                type: "uint8",
-            },
+            { internalType: "enum MainGovernance.ProposalStatus", name: "status", type: "uint8" },
             { internalType: "uint256", name: "finalYesVotes", type: "uint256" },
             { internalType: "uint256", name: "finalNoVotes", type: "uint256" },
             { internalType: "bool", name: "voteTallyFinalized", type: "bool" },
@@ -362,13 +354,6 @@ export const mainABI = [
         type: "function",
     },
     {
-        inputs: [{ internalType: "string", name: "", type: "string" }],
-        name: "registeredChains",
-        outputs: [{ internalType: "bool", name: "", type: "bool" }],
-        stateMutability: "view",
-        type: "function",
-    },
-    {
         inputs: [],
         name: "relayer",
         outputs: [{ internalType: "address", name: "", type: "address" }],
@@ -380,20 +365,6 @@ export const mainABI = [
         name: "renounceOwnership",
         outputs: [],
         stateMutability: "nonpayable",
-        type: "function",
-    },
-    {
-        inputs: [
-            { internalType: "bytes32", name: "", type: "bytes32" },
-            { internalType: "string", name: "", type: "string" },
-        ],
-        name: "secondaryChainVotes",
-        outputs: [
-            { internalType: "uint256", name: "yesVotes", type: "uint256" },
-            { internalType: "uint256", name: "noVotes", type: "uint256" },
-            { internalType: "bool", name: "collected", type: "bool" },
-        ],
-        stateMutability: "view",
         type: "function",
     },
     {

@@ -10,14 +10,14 @@ export const CONFIG = {
         CHAIN_ID: "main",
         RPC_URL: process.env.ARB_RPC || "",
         WS_URL: process.env.ARB_WS_URL || "",
-        CONTRACT: "0x6843a77F821a80D71Ac994c5288A2a061ec77d53",
+        CONTRACT: "0x8Dfdc3D4837aa7cB73B664536Fb0557Af7C82c5d",
     },
     SECONDARY_CHAINS: [
         {
             CHAIN_ID: "bsc",
             RPC_URL: process.env.BSC_RPC || "",
             WS_URL: process.env.BSC_WS_URL || "",
-            CONTRACT: "0x402BD069C8a175f083025b10C56791340296CC6A",
+            CONTRACT: "0x8Dfdc3D4837aa7cB73B664536Fb0557Af7C82c5d",
         },
     ],
 };
