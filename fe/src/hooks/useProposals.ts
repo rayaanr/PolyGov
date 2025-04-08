@@ -28,11 +28,38 @@ const useProposals = () => {
         error: mainError,
     } = useChainProposalDetails(MAIN_CONFIG, proposalIds);
 
-    // Create separate hooks for each secondary chain at the top level
-    const secondaryChainResults = CONFIG.SECONDARY_CHAINS.map((chain) => {
-        const { proposals, isLoading, error } = useChainProposalDetails(chain, proposalIds);
-        return { proposals, isLoading, error, chainName: chain.name, chainId: chain.chainId };
-    });
+    // Explicitly call useChainProposalDetails for each secondary chain (assuming 2 chains)
+    const secondaryChain1 = CONFIG.SECONDARY_CHAINS[0];
+    // const secondaryChain2 = CONFIG.SECONDARY_CHAINS[1];
+
+    const {
+        proposals: proposals1,
+        isLoading: isLoading1,
+        error: error1,
+    } = useChainProposalDetails(secondaryChain1, proposalIds);
+
+    // const {
+    //     proposals: proposals2,
+    //     isLoading: isLoading2,
+    //     error: error2,
+    // } = useChainProposalDetails(secondaryChain2, proposalIds);
+
+    const secondaryChainResults = [
+        {
+            proposals: proposals1,
+            isLoading: isLoading1,
+            error: error1,
+            chainName: secondaryChain1.name,
+            chainId: secondaryChain1.chainId,
+        },
+        // {
+        //     proposals: proposals2,
+        //     isLoading: isLoading2,
+        //     error: error2,
+        //     chainName: secondaryChain2.name,
+        //     chainId: secondaryChain2.chainId,
+        // },
+    ];
 
     const isLoading =
         isLoadingIds || isLoadingMain || secondaryChainResults.some((c) => c.isLoading);

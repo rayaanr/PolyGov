@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import CONFIG, { MAIN_CONFIG } from "@/constants/config";
 import useChainProposalDetails from "./useChainProposalDetails";
 import { CombinedProposal, SecondaryProposal } from "@/lib/types";
@@ -26,36 +26,38 @@ const useProposalById = (proposalId: string) => {
         error: mainError,
     } = useChainProposalDetails(MAIN_CONFIG, [proposalId]);
 
-    const secondaryChainConfigs = useMemo(() => CONFIG.SECONDARY_CHAINS, []);
+    // Explicitly call useChainProposalDetails for each secondary chain (assuming 2 chains)
+    const secondaryChain1 = CONFIG.SECONDARY_CHAINS[0];
+    // const secondaryChain2 = CONFIG.SECONDARY_CHAINS[1];
 
-    const secondaryResultsArray = secondaryChainConfigs.map((chain) => {
-        return useChainProposalDetails(chain, [proposalId]);
-    });
+    const {
+        proposals: proposals1,
+        isLoading: isLoading1,
+        error: error1,
+    } = useChainProposalDetails(secondaryChain1, [proposalId]);
 
-    const secondaryChains = useMemo(() => {
-        return secondaryChainConfigs.map((chain, index) => {
-            const result = secondaryResultsArray[index];
-            return {
-                proposals: result.proposals,
-                isLoading: result.isLoading,
-                error: result.error,
-                chainName: chain.name,
-                chainId: chain.chainId,
-            };
-        });
-    }, [
-        secondaryChainConfigs,
-        // Use serializeBigInt instead of JSON.stringify
-        secondaryResultsArray
-            .map((r) =>
-                serializeBigInt({
-                    proposals: r.proposals,
-                    isLoading: r.isLoading,
-                    errorMsg: r.error?.message,
-                })
-            )
-            .join("|"),
-    ]);
+    // const {
+    //     proposals: proposals2,
+    //     isLoading: isLoading2,
+    //     error: error2,
+    // } = useChainProposalDetails(secondaryChain2, [proposalId]);
+
+    const secondaryChains = [
+        {
+            proposals: proposals1,
+            isLoading: isLoading1,
+            error: error1,
+            chainName: secondaryChain1.name,
+            chainId: secondaryChain1.chainId,
+        },
+        // {
+        //     proposals: proposals2,
+        //     isLoading: isLoading2,
+        //     error: error2,
+        //     chainName: secondaryChain2.name,
+        //     chainId: secondaryChain2.chainId,
+        // },
+    ];
 
     useEffect(() => {
         if (isFirstRender.current) {
@@ -146,15 +148,7 @@ const useProposalById = (proposalId: string) => {
             }
             return prev;
         });
-    }, [
-        proposalId,
-        serializeBigInt({
-            proposals: mainProposals,
-            error: mainError?.message,
-        }),
-        isLoadingMain,
-        secondaryChains,
-    ]);
+    }, [proposalId, mainProposals, isLoadingMain, mainError, secondaryChains]);
 
     return result;
 };
