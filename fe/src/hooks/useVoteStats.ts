@@ -14,8 +14,8 @@ const useVoteStats = (
 ): VoteStats => {
     const totalVotes = [mainProposal, ...secondaryProposals.map((sp) => sp.proposal)].reduce(
         (acc, proposal) => {
-            acc.yes += Number(proposal.yesVotes / VOTE_DIVISOR);
-            acc.no += Number(proposal.noVotes / VOTE_DIVISOR);
+            acc.yes += Number(proposal.yesVotes) / 10 ** 18;
+            acc.no += Number(proposal.noVotes) / 10 ** 18;
             return acc;
         },
         { yes: 0, no: 0 }

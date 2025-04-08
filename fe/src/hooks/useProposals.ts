@@ -28,14 +28,15 @@ const useProposals = () => {
         error: mainError,
     } = useChainProposalDetails(MAIN_CONFIG, proposalIds);
 
-    const secondaryChains = CONFIG.SECONDARY_CHAINS.map((chain) => ({
-        ...useChainProposalDetails(chain, proposalIds),
-        chainName: chain.name,
-        chainId: chain.chainId,
-    }));
+    // Create separate hooks for each secondary chain at the top level
+    const secondaryChainResults = CONFIG.SECONDARY_CHAINS.map((chain) => {
+        const { proposals, isLoading, error } = useChainProposalDetails(chain, proposalIds);
+        return { proposals, isLoading, error, chainName: chain.name, chainId: chain.chainId };
+    });
 
-    const isLoading = isLoadingIds || isLoadingMain || secondaryChains.some((c) => c.isLoading);
-    const error = idsError || mainError || secondaryChains.find((c) => c.error)?.error;
+    const isLoading =
+        isLoadingIds || isLoadingMain || secondaryChainResults.some((c) => c.isLoading);
+    const error = idsError || mainError || secondaryChainResults.find((c) => c.error)?.error;
 
     const combinedProposals: CombinedProposal[] = [];
 
@@ -46,11 +47,11 @@ const useProposals = () => {
         const id = proposalIds[index];
         const secondaryProposals: SecondaryProposal[] = [];
 
-        for (const chain of secondaryChains) {
-            const proposal = chain.proposals[index];
+        for (const chainResult of secondaryChainResults) {
+            const proposal = chainResult.proposals[index];
             if (proposal && isSecondaryProposalDetails(proposal)) {
                 secondaryProposals.push({
-                    chainName: chain.chainName,
+                    chainName: chainResult.chainName,
                     proposal: proposal,
                 });
             }
@@ -65,6 +66,5 @@ const useProposals = () => {
 
     return { combinedProposals, isLoading, error, totalCount: allIds.length };
 };
-
 
 export default useProposals;

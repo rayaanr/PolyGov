@@ -1,6 +1,6 @@
 import { mainABI } from "@/constants/abi/main";
 import { arbABI } from "@/constants/abi/secondary";
-import { bscTestnet, arbitrumSepolia, type Chain } from "wagmi/chains";
+import { bscTestnet, arbitrumSepolia} from "wagmi/chains";
 import { Abi } from "viem";
 
 interface ChainConfig {

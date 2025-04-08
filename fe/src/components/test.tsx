@@ -16,6 +16,11 @@ import ProgressBar from "./ui/progress-bar";
 export default function ProposalDetails({ id }: { id: string }) {
     const { proposal, isLoading, error } = useProposalById(id);
 
+    const { yes, no } = useVoteStats(
+        proposal?.mainProposal ?? ({} as any),
+        proposal?.secondaryProposals ?? []
+    );
+
     const {
         data: ipfsData,
         isLoading: ipfsLoading,
@@ -33,8 +38,6 @@ export default function ProposalDetails({ id }: { id: string }) {
     if (!proposal) {
         return notFound();
     }
-
-    const { yes, no } = useVoteStats(proposal.mainProposal, proposal.secondaryProposals);
 
     return (
         <div className="container max-w-3xl mx-auto p-4 space-y-6">
