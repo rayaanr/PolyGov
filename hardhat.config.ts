@@ -1,10 +1,19 @@
 import { HardhatUserConfig } from "hardhat/config";
 import "@nomicfoundation/hardhat-toolbox";
+import "@nomicfoundation/hardhat-ignition";
 import "dotenv/config";
-import { CHAINS_INFO } from "./constants/chains";
 
 const config: HardhatUserConfig = {
-    solidity: "0.8.28",
+    solidity: {
+        version: "0.8.28",
+        settings: {
+            optimizer: {
+                enabled: true,
+                runs: 200,
+            },
+            viaIR: true,
+        },
+    },
     networks: {
         bscTestnet: {
             url: "https://data-seed-prebsc-1-s1.binance.org:8545",

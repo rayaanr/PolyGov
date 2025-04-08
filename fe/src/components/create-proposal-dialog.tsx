@@ -26,51 +26,108 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { PlusIcon } from "lucide-react";
 import { useCreateProposal } from "@/hooks/useCreateProposal";
-import { toast } from "sonner";
+import { encodeUpdateValueCalldata } from "@/lib/utils";
 
+const MIN_DURATION = 3; // Minimum duration in minutes
+const MAX_DURATION = 1440; // Maximum duration in minutes
+
+// Simplified schema that uses minutes directly instead of Date objects
 const formSchema = z.object({
     title: z.string().min(5, "Title must be at least 5 characters"),
     description: z.string().min(20, "Description must be at least 20 characters"),
-    endDate: z
-        .date()
-        .min(new Date(), "End date must be in the future")
-        .refine((date) => {
-            const days = (date.getTime() - Date.now()) / (1000 * 60 * 60 * 24);
-            return days <= 30;
-        }, "Voting duration cannot exceed 30 days"),
+    durationMinutes: z
+        .number()
+        .int("Duration must be a whole number")
+        .min(MIN_DURATION, `Minimum duration is ${MIN_DURATION} minutes`)
+        .max(MAX_DURATION, `Maximum duration is ${MAX_DURATION} minutes`),
 });
+
+// Contract constants moved outside component
+const EXEUTING_CONTRACT = "0x54DccD4b6dca0a13767A17899E706911Cdf8D106";
+const DURATION_PRESETS = [
+    { value: MIN_DURATION, label: `${MIN_DURATION} min` },
+    { value: 60, label: "1 hr" },
+    { value: 360, label: "6 hrs" },
+    { value: 1440, label: "1 day" },
+];
 
 export function CreateProposalDialog() {
     const [open, setOpen] = useState(false);
     const { createProposal, isPending } = useCreateProposal();
+    const [isUploading, setIsUploading] = useState(false);
 
     const form = useForm<z.infer<typeof formSchema>>({
         resolver: zodResolver(formSchema),
         defaultValues: {
             title: "",
             description: "",
-            endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days from now
+            durationMinutes: MIN_DURATION,
         },
     });
 
-    async function onSubmit(values: z.infer<typeof formSchema>) {
+    // Simplified upload function
+    const uploadToPinata = async (jsonData: { title: string; description: string }) => {
         try {
-            // Calculate duration in days
-            const durationDays = Math.ceil(
-                (values.endDate.getTime() - Date.now()) / (24 * 60 * 60 * 1000)
+            setIsUploading(true);
+            const response = await fetch("/api/files", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(jsonData),
+            });
+
+            if (!response.ok) {
+                throw new Error(`Upload failed with status: ${response.status}`);
+            }
+
+            return await response.json();
+        } catch (error) {
+            console.error("Error uploading to Pinata:", error);
+            return null;
+        } finally {
+            setIsUploading(false);
+        }
+    };
+
+    const onSubmit = async (values: z.infer<typeof formSchema>) => {
+        try {
+            // Prepare the proposal data
+            const proposalData = {
+                title: values.title,
+                description: values.description,
+            };
+
+            // Upload to IPFS via Pinata
+            const ipfsResponse = await uploadToPinata(proposalData);
+            if (!ipfsResponse) {
+                throw new Error("Failed to pin content to IPFS");
+            }
+
+            const ipfsHash = ipfsResponse.IpfsHash || ipfsResponse.split("/ipfs/").pop();
+
+            if (!ipfsHash) {
+                throw new Error("Invalid IPFS hash");
+            }
+
+            const calldata = encodeUpdateValueCalldata(values.title);
+
+            // Create the proposal
+            await createProposal(
+                values.title,
+                ipfsHash,
+                values.durationMinutes.toString(),
+                EXEUTING_CONTRACT,
+                calldata
             );
 
-            // Call the createProposal function
-            await createProposal(values.title, values.description, durationDays.toString());
-
-            // Close the dialog and reset the form
+            // Reset and close
             setOpen(false);
             form.reset();
-        } catch (err) {
-            // Errors are already handled in the hook, so no need to display them here
-            console.error("Failed to create proposal:", err);
+        } catch (error) {
+            console.error("Error creating proposal:", error);
         }
-    }
+    };
+
+    const isSubmitting = isPending || isUploading;
 
     return (
         <Dialog open={open} onOpenChange={setOpen}>
@@ -120,7 +177,8 @@ export function CreateProposalDialog() {
                                         />
                                     </FormControl>
                                     <FormDescription>
-                                        Detailed description of what your proposal aims to achieve
+                                        Detailed description of what your proposal aims to achieve.
+                                        This will be stored as JSON on IPFS.
                                     </FormDescription>
                                     <FormMessage />
                                 </FormItem>
@@ -128,65 +186,61 @@ export function CreateProposalDialog() {
                         />
                         <FormField
                             control={form.control}
-                            name="endDate"
+                            name="durationMinutes"
                             render={({ field }) => (
                                 <FormItem className="space-y-4">
-                                    <FormLabel>Voting Duration (Days)</FormLabel>
+                                    <FormLabel>Voting Duration (Minutes)</FormLabel>
                                     <FormControl>
                                         <Input
                                             type="number"
-                                            min={1}
-                                            max={30}
+                                            min={MIN_DURATION}
+                                            max={MAX_DURATION}
                                             {...field}
                                             onChange={(e) => {
-                                                const days = Math.min(
-                                                    30,
-                                                    Math.max(
-                                                        1,
-                                                        Number.parseInt(e.target.value) || 1
+                                                // Ensure value is within bounds
+                                                const value = Math.max(
+                                                    MIN_DURATION,
+                                                    Math.min(
+                                                        MAX_DURATION,
+                                                        parseInt(e.target.value) || 5
                                                     )
                                                 );
-                                                field.onChange(
-                                                    new Date(
-                                                        Date.now() + days * 24 * 60 * 60 * 1000
-                                                    )
-                                                );
+                                                field.onChange(value);
                                             }}
-                                            value={Math.ceil(
-                                                (field.value.getTime() - Date.now()) /
-                                                    (24 * 60 * 60 * 1000)
-                                            )}
                                         />
                                     </FormControl>
-                                    <div className="flex gap-2">
-                                        {[3, 5, 7, 10].map((days) => (
+                                    <div className="flex gap-2 flex-wrap">
+                                        {DURATION_PRESETS.map((preset) => (
                                             <Button
-                                                key={days}
+                                                key={preset.value}
                                                 type="button"
                                                 variant="outline"
                                                 size="sm"
-                                                onClick={() =>
-                                                    field.onChange(
-                                                        new Date(
-                                                            Date.now() + days * 24 * 60 * 60 * 1000
-                                                        )
-                                                    )
+                                                onClick={() => field.onChange(preset.value)}
+                                                className={
+                                                    field.value === preset.value
+                                                        ? "bg-primary/20"
+                                                        : ""
                                                 }
                                             >
-                                                {days}d
+                                                {preset.label}
                                             </Button>
                                         ))}
                                     </div>
                                     <FormDescription>
-                                        Select the number of days the proposal will be open for
-                                        voting (max 30 days)
+                                        {`Select the number of minutes the proposal will be open for
+                                        voting (${MIN_DURATION} minutes to 1 day)`}
                                     </FormDescription>
                                     <FormMessage />
                                 </FormItem>
                             )}
                         />
-                        <Button type="submit" className="w-full" disabled={isPending}>
-                            {isPending ? "Creating Proposal..." : "Create Proposal"}
+                        <Button type="submit" className="w-full" disabled={isSubmitting}>
+                            {isPending
+                                ? "Creating Proposal..."
+                                : isUploading
+                                ? "Uploading to IPFS..."
+                                : "Create Proposal"}
                         </Button>
                     </form>
                 </Form>

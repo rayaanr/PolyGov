@@ -1,3 +1,5 @@
+import { MAIN_CONFIG } from "@/constants/config";
+
 export type Chain = "ethereum" | "polygon" | "arbitrum" | "optimism";
 
 export type ProposalStatus = "active" | "passed" | "failed" | "pending";
@@ -32,4 +34,58 @@ export interface GovernanceStats {
     activeProposals: number;
     totalVoters: number;
     averageParticipation: number;
+}
+
+//---------------------
+enum ProposalStatusEnum {
+    Pending = 0,
+    Accepted = 1,
+    Rejected = 2,
+}
+
+// Main proposal details
+export interface ProposalDetails {
+    id: string;
+    title: string;
+    ipfsHash: string;
+    yesVotes: bigint;
+    noVotes: bigint;
+    startTime: bigint;
+    endTime: bigint;
+    proposer: string;
+    status: ProposalStatusEnum;
+    finalYesVotes: bigint;
+    finalNoVotes: bigint;
+    voteTallyFinalized: boolean;
+    executed: boolean;
+}
+
+// Secondary proposal details
+export interface SecondaryProposalDetails {
+    id: string;
+    title: string;
+    ipfsHash: string;
+    yesVotes: bigint;
+    noVotes: bigint;
+    startTime: bigint;
+    endTime: bigint;
+    status: ProposalStatusEnum;
+    voteFinalized: boolean;
+}
+
+// Types
+export type ChainConfig = typeof MAIN_CONFIG;
+export type ProposalId = string;
+
+// Secondary proposal wrapper
+export interface SecondaryProposal {
+    chainName: string;
+    proposal: SecondaryProposalDetails;
+}
+
+// Combined proposal structure
+export interface CombinedProposal {
+    id: ProposalId;
+    mainProposal: ProposalDetails;
+    secondaryProposals: SecondaryProposal[];
 }

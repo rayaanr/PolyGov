@@ -24,3 +24,7 @@ wallets.json
 # Ignore all .env files
 **/.env
 **/.env.*
+
+/constants/accounts.ts
+
+/relayer/utils/proposal_cache.json

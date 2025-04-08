@@ -1,92 +1,97 @@
-import { useReadContracts, useReadContract } from "wagmi";
-import { GovernanceBSCABI } from "@/constants/abi/BSCGovABI";
-import { bscTestnet } from "wagmi/chains";
-import { CONTRACTS } from "@/constants/contracts";
+import CONFIG, { MAIN_CONFIG } from "@/constants/config";
+import useChainProposalDetails from "./useChainProposalDetails";
+import useProposalIds from "./useProposalIds";
+import {
+    CombinedProposal,
+    ProposalDetails,
+    SecondaryProposal,
+    SecondaryProposalDetails,
+} from "@/lib/types";
 
-type Proposal = {
-    id: bigint;
-    title: string;
-    description: string;
-    yesVotes: bigint;
-    noVotes: bigint;
-    startTime: bigint;
-    endTime: bigint;
-    status: number;
-    snapshotBlock: bigint;
-};
-
-const governanceContract = {
-    address: CONTRACTS.bscTestnet.governanceContract,
-    abi: GovernanceBSCABI,
-};
-
-export function useProposals() {
-    // Fetch proposal count
-    const { data: proposalCount, isLoading: isCountLoading } = useReadContract({
-        ...governanceContract,
-        functionName: "proposalCount",
-        chainId: bscTestnet.id,
-    });
-
-    // Convert proposal count to number and create indices
-    const totalProposals = Number(proposalCount || 0);
-    const proposalIndices = Array.from({ length: totalProposals }, (_, i) => BigInt(i));
-
-    // Fetch proposals data (always call the hook, even if there are no proposals)
-    const { data: proposalsData, isLoading: isProposalsLoading } = useReadContracts({
-        contracts:
-            totalProposals > 0
-                ? proposalIndices.map((index) => ({
-                      ...governanceContract,
-                      functionName: "proposals",
-                      args: [index],
-                      chainId: bscTestnet.id,
-                  }))
-                : [], // Provide an empty array if no proposals
-    });
-
-    // Process and format proposals data
-    const proposals: Proposal[] =
-        proposalsData
-            ?.filter((result) => result.status === "success")
-            .map((result) => {
-                const [
-                    id,
-                    title,
-                    description,
-                    yesVotes,
-                    noVotes,
-                    startTime,
-                    endTime,
-                    status,
-                    snapshotBlock,
-                ] = result.result as unknown as [
-                    bigint,
-                    string,
-                    string,
-                    bigint,
-                    bigint,
-                    bigint,
-                    bigint,
-                    number,
-                    bigint
-                ];
-
-                return {
-                    id,
-                    title,
-                    description,
-                    yesVotes,
-                    noVotes,
-                    startTime,
-                    endTime,
-                    status,
-                    snapshotBlock,
-                };
-            }) || [];
-
-    return {
-        proposals,
-        isLoading: isCountLoading || isProposalsLoading,
-    };
+// Type guard to check if a proposal is a SecondaryProposalDetails
+export function isSecondaryProposalDetails(proposal: any): proposal is SecondaryProposalDetails {
+    return proposal && typeof proposal === "object" && "voteFinalized" in proposal;
 }
+
+// Type guard to check if a proposal is a ProposalDetails
+export function isProposalDetails(proposal: any): proposal is ProposalDetails {
+    return proposal && typeof proposal === "object" && "voteTallyFinalized" in proposal;
+}
+
+// Hook for all proposals
+const useProposals = () => {
+    const { proposalIds, allIds, isLoading: isLoadingIds, error: idsError } = useProposalIds();
+
+    const {
+        proposals: mainProposals,
+        isLoading: isLoadingMain,
+        error: mainError,
+    } = useChainProposalDetails(MAIN_CONFIG, proposalIds);
+
+    // Explicitly call useChainProposalDetails for each secondary chain (assuming 2 chains)
+    const secondaryChain1 = CONFIG.SECONDARY_CHAINS[0];
+    // const secondaryChain2 = CONFIG.SECONDARY_CHAINS[1];
+
+    const {
+        proposals: proposals1,
+        isLoading: isLoading1,
+        error: error1,
+    } = useChainProposalDetails(secondaryChain1, proposalIds);
+
+    // const {
+    //     proposals: proposals2,
+    //     isLoading: isLoading2,
+    //     error: error2,
+    // } = useChainProposalDetails(secondaryChain2, proposalIds);
+
+    const secondaryChainResults = [
+        {
+            proposals: proposals1,
+            isLoading: isLoading1,
+            error: error1,
+            chainName: secondaryChain1.name,
+            chainId: secondaryChain1.chainId,
+        },
+        // {
+        //     proposals: proposals2,
+        //     isLoading: isLoading2,
+        //     error: error2,
+        //     chainName: secondaryChain2.name,
+        //     chainId: secondaryChain2.chainId,
+        // },
+    ];
+
+    const isLoading =
+        isLoadingIds || isLoadingMain || secondaryChainResults.some((c) => c.isLoading);
+    const error = idsError || mainError || secondaryChainResults.find((c) => c.error)?.error;
+
+    const combinedProposals: CombinedProposal[] = [];
+
+    for (let index = 0; index < mainProposals.length; index++) {
+        const mainProposal = mainProposals[index];
+        if (!mainProposal || !isProposalDetails(mainProposal)) continue;
+
+        const id = proposalIds[index];
+        const secondaryProposals: SecondaryProposal[] = [];
+
+        for (const chainResult of secondaryChainResults) {
+            const proposal = chainResult.proposals[index];
+            if (proposal && isSecondaryProposalDetails(proposal)) {
+                secondaryProposals.push({
+                    chainName: chainResult.chainName,
+                    proposal: proposal,
+                });
+            }
+        }
+
+        combinedProposals.push({
+            id,
+            mainProposal,
+            secondaryProposals,
+        });
+    }
+
+    return { combinedProposals, isLoading, error, totalCount: allIds.length };
+};
+
+export default useProposals;
