@@ -1,6 +1,7 @@
 import { clsx, type ClassValue } from "clsx";
 import { format } from "date-fns";
 import { twMerge } from "tailwind-merge";
+import { Interface } from "ethers";
 
 export function cn(...inputs: ClassValue[]) {
     return twMerge(clsx(inputs));
@@ -18,6 +19,7 @@ const STATUS_MAP: Record<number, string> = {
     0: "Active",
     1: "Accepted",
     2: "Rejected",
+    3: "Executed",
 } as const;
 
 type StatusValue = keyof typeof STATUS_MAP;
@@ -31,6 +33,7 @@ const BADGE_VARIANTS = {
     Active: "default",
     Rejected: "destructive",
     Accepted: "success",
+    Executed: "success",
 } as const;
 
 // Type for badge variants
@@ -40,3 +43,10 @@ export const getBadgeVariant = (status: number): BadgeVariant => {
     const statusText = getStatusText(status);
     return BADGE_VARIANTS[statusText as keyof typeof BADGE_VARIANTS] ?? "secondary";
 };
+
+export function encodeUpdateValueCalldata(title: string) {
+    const abi = ["function updateValue(string newValue)"];
+    const iface = new Interface(abi);
+    const calldata = iface.encodeFunctionData("updateValue", [title]);
+    return calldata;
+}

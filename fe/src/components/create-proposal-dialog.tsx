@@ -26,6 +26,10 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { PlusIcon } from "lucide-react";
 import { useCreateProposal } from "@/hooks/useCreateProposal";
+import { encodeUpdateValueCalldata } from "@/lib/utils";
+
+const MIN_DURATION = 3; // Minimum duration in minutes
+const MAX_DURATION = 1440; // Maximum duration in minutes
 
 // Simplified schema that uses minutes directly instead of Date objects
 const formSchema = z.object({
@@ -34,14 +38,12 @@ const formSchema = z.object({
     durationMinutes: z
         .number()
         .int("Duration must be a whole number")
-        .min(5, "Minimum duration is 5 minutes")
-        .max(1440, "Maximum duration is 1 day (1440 minutes)"),
+        .min(MIN_DURATION, `Minimum duration is ${MIN_DURATION} minutes`)
+        .max(MAX_DURATION, `Maximum duration is ${MAX_DURATION} minutes`),
 });
 
 // Contract constants moved outside component
-const CONTRACT_ADDRESS = "0x5E9FfD829924d59F2E6663fb9b3bfCAe3a672AA6";
-const DEFAULT_CALLDATA =
-    "0x1db05a880000000000000000000000000000000000000000000000000000000000000064";
+const EXEUTING_CONTRACT = "0x54DccD4b6dca0a13767A17899E706911Cdf8D106";
 const DURATION_PRESETS = [
     { value: 5, label: "5 min" },
     { value: 60, label: "1 hr" },
@@ -102,13 +104,19 @@ export function CreateProposalDialog() {
 
             const ipfsHash = ipfsResponse.IpfsHash || ipfsResponse.split("/ipfs/").pop();
 
+            if (!ipfsHash) {
+                throw new Error("Invalid IPFS hash");
+            }
+
+            const calldata = encodeUpdateValueCalldata(values.title);
+
             // Create the proposal
             await createProposal(
                 values.title,
                 ipfsHash,
                 values.durationMinutes.toString(),
-                CONTRACT_ADDRESS,
-                DEFAULT_CALLDATA
+                EXEUTING_CONTRACT,
+                calldata
             );
 
             // Reset and close
@@ -185,14 +193,14 @@ export function CreateProposalDialog() {
                                     <FormControl>
                                         <Input
                                             type="number"
-                                            min={5}
-                                            max={1440}
+                                            min={MIN_DURATION}
+                                            max={MAX_DURATION}
                                             {...field}
                                             onChange={(e) => {
                                                 // Ensure value is within bounds
                                                 const value = Math.max(
-                                                    5,
-                                                    Math.min(1440, parseInt(e.target.value) || 5)
+                                                    MIN_DURATION,
+                                                    Math.min(MAX_DURATION, parseInt(e.target.value) || 5)
                                                 );
                                                 field.onChange(value);
                                             }}

@@ -245,8 +245,7 @@
                     { "internalType": "bool", "name": "voteTallyFinalized", "type": "bool" },
                     { "internalType": "address[]", "name": "targets", "type": "address[]" },
                     { "internalType": "uint256[]", "name": "values", "type": "uint256[]" },
-                    { "internalType": "bytes[]", "name": "calldatas", "type": "bytes[]" },
-                    { "internalType": "bool", "name": "executed", "type": "bool" }
+                    { "internalType": "bytes[]", "name": "calldatas", "type": "bytes[]" }
                 ],
                 "internalType": "struct MainGovernance.Proposal",
                 "name": "",
@@ -365,8 +364,7 @@
             },
             { "internalType": "uint256", "name": "finalYesVotes", "type": "uint256" },
             { "internalType": "uint256", "name": "finalNoVotes", "type": "uint256" },
-            { "internalType": "bool", "name": "voteTallyFinalized", "type": "bool" },
-            { "internalType": "bool", "name": "executed", "type": "bool" }
+            { "internalType": "bool", "name": "voteTallyFinalized", "type": "bool" }
         ],
         "stateMutability": "view",
         "type": "function"

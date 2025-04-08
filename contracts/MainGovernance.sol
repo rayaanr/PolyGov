@@ -40,7 +40,6 @@ contract MainGovernance is Ownable, ReentrancyGuard {
         address[] targets;
         uint256[] values;
         bytes[] calldatas;
-        bool executed;
     }
 
     struct VoteSummary {
@@ -244,16 +243,19 @@ contract MainGovernance is Ownable, ReentrancyGuard {
         }
 
         uint256 totalVotes = totalYesVotes + totalNoVotes;
-        if (totalVotes < quorumVotes) {
-            proposal.voteTallyFinalized = true;
-            proposal.status = ProposalStatus.Rejected;
-            emit VoteTallyFinalized(proposalId, totalYesVotes, totalNoVotes);
-            return;
-        }
-
         proposal.finalYesVotes = totalYesVotes;
         proposal.finalNoVotes = totalNoVotes;
         proposal.voteTallyFinalized = true;
+
+        if (totalVotes < quorumVotes) {
+            proposal.status = ProposalStatus.Rejected;
+        } else {
+            if (totalYesVotes > totalNoVotes) {
+                proposal.status = ProposalStatus.Accepted;
+            } else {
+                proposal.status = ProposalStatus.Rejected;
+            }
+        }
 
         emit VoteTallyFinalized(proposalId, totalYesVotes, totalNoVotes);
     }
@@ -262,23 +264,19 @@ contract MainGovernance is Ownable, ReentrancyGuard {
     function executeProposal(bytes32 proposalId) external nonReentrant {
         Proposal storage proposal = proposals[proposalId];
         if (!proposal.voteTallyFinalized) revert("Votes not finalized");
-        if (proposal.executed) revert ProposalAlreadyExecuted(proposalId);
+        if (proposal.status == ProposalStatus.Executed)
+            revert ProposalAlreadyExecuted(proposalId);
+        if (proposal.status != ProposalStatus.Accepted)
+            revert("Proposal not accepted");
 
-        if (proposal.finalYesVotes > proposal.finalNoVotes) {
-            proposal.status = ProposalStatus.Accepted;
-
-            for (uint i = 0; i < proposal.targets.length; i++) {
-                (bool success, ) = proposal.targets[i].call{
-                    value: proposal.values[i]
-                }(proposal.calldatas[i]);
-                if (!success) revert ExecutionFailed(proposal.targets[i], i);
-            }
-
-            proposal.executed = true;
-            proposal.status = ProposalStatus.Executed;
-        } else {
-            proposal.status = ProposalStatus.Rejected;
+        for (uint i = 0; i < proposal.targets.length; i++) {
+            (bool success, ) = proposal.targets[i].call{
+                value: proposal.values[i]
+            }(proposal.calldatas[i]);
+            if (!success) revert ExecutionFailed(proposal.targets[i], i);
         }
+
+        proposal.status = ProposalStatus.Executed;
 
         emit ProposalExecuted(proposalId, proposal.status);
     }

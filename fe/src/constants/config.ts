@@ -27,7 +27,7 @@ const CONFIG: {
         explorerUrl: arbitrumSepolia.blockExplorers?.default.url,
         contracts: {
             token: "0xc359f38eD76d8941d486dA85a4aA553Aa74b18BD",
-            governance: "0x8Dfdc3D4837aa7cB73B664536Fb0557Af7C82c5d",
+            governance: "0xe83DaE1FF22Af582e846BCBfD3bc9E4f965cB208",
         },
         abi: {
             governance: mainABI as Abi,
