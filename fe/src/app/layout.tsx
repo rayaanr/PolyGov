@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import { Nav } from "@/components/nav";
 import { GeistSans } from "geist/font/sans";
 import "./globals.css";
@@ -26,6 +27,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                         <Toaster position="top-center" richColors />
                     </WalletProvider>
                 </ThemeProvider>
+                <SpeedInsights />
             </body>
         </html>
     );
