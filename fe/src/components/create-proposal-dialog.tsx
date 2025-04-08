@@ -45,7 +45,7 @@ const formSchema = z.object({
 // Contract constants moved outside component
 const EXEUTING_CONTRACT = "0x54DccD4b6dca0a13767A17899E706911Cdf8D106";
 const DURATION_PRESETS = [
-    { value: 5, label: "5 min" },
+    { value: MIN_DURATION, label: `${MIN_DURATION} min` },
     { value: 60, label: "1 hr" },
     { value: 360, label: "6 hrs" },
     { value: 1440, label: "1 day" },
@@ -61,7 +61,7 @@ export function CreateProposalDialog() {
         defaultValues: {
             title: "",
             description: "",
-            durationMinutes: 5, // Default to 5 minutes
+            durationMinutes: MIN_DURATION,
         },
     });
 
@@ -200,7 +200,10 @@ export function CreateProposalDialog() {
                                                 // Ensure value is within bounds
                                                 const value = Math.max(
                                                     MIN_DURATION,
-                                                    Math.min(MAX_DURATION, parseInt(e.target.value) || 5)
+                                                    Math.min(
+                                                        MAX_DURATION,
+                                                        parseInt(e.target.value) || 5
+                                                    )
                                                 );
                                                 field.onChange(value);
                                             }}
@@ -225,8 +228,8 @@ export function CreateProposalDialog() {
                                         ))}
                                     </div>
                                     <FormDescription>
-                                        Select the number of minutes the proposal will be open for
-                                        voting (5 minutes to 1 day)
+                                        {`Select the number of minutes the proposal will be open for
+                                        voting (${MIN_DURATION} minutes to 1 day)`}
                                     </FormDescription>
                                     <FormMessage />
                                 </FormItem>

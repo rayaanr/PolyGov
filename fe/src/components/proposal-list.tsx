@@ -4,7 +4,6 @@ import Link from "next/link";
 import React from "react";
 import { Badge } from "./ui/badge";
 import { formatDate, getBadgeVariant, getStatusText } from "@/lib/utils";
-import { Progress } from "./ui/progress";
 import CONFIG, { MAIN_CONFIG } from "@/constants/config";
 import useProposals from "@/hooks/useProposals";
 import { ProposalSkeleton } from "./proposal-skeleton";
@@ -12,6 +11,8 @@ import Image from "next/image";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "./ui/card";
 import { CalendarIcon, Clock } from "lucide-react";
 import { useIpfsData } from "@/hooks/useIpfsData";
+import ProgressBar from "./ui/progress-bar";
+import { TOTAL_VOTING_POWER } from "@/constants/const";
 
 export function ProposalList() {
     const { combinedProposals, isLoading, error, totalCount } = useProposals();
@@ -29,16 +30,6 @@ export function ProposalList() {
     );
 }
 
-const VoteProgress = ({ label, percentage }: { label: string; percentage: string }) => (
-    <>
-        <div className="flex justify-between text-xs">
-            <span className="text-muted-foreground">{label}</span>
-            <span className="font-medium">{percentage}</span>
-        </div>
-        <Progress value={Number(percentage)} className="h-1" />
-    </>
-);
-
 const ChainBadge = ({ icon, chainName }: { icon: string; chainName: string }) => (
     <div className="flex text-xs gap-1 items-center rounded-full bg-secondary text-secondary-foreground px-1">
         <Image
@@ -54,7 +45,7 @@ const ChainBadge = ({ icon, chainName }: { icon: string; chainName: string }) =>
 
 function ProposalCard({ proposal }: { proposal: CombinedProposal }) {
     const { id, mainProposal, secondaryProposals } = proposal;
-    const { yesPercentage, noPercentage } = useVoteStats(mainProposal, secondaryProposals);
+    const { yes, no } = useVoteStats(mainProposal, secondaryProposals);
 
     const {
         data: ipfsData,
@@ -93,8 +84,7 @@ function ProposalCard({ proposal }: { proposal: CombinedProposal }) {
                 </CardHeader>
                 <CardContent className="space-y-3 py-2 flex-grow">
                     <div className="space-y-3">
-                        <VoteProgress label="Total For" percentage={yesPercentage} />
-                        <VoteProgress label="Total Against" percentage={noPercentage} />
+                        <ProgressBar yesVotes={yes} noVotes={no} maxVotingPower={TOTAL_VOTING_POWER} />
                     </div>
 
                     <div className="flex flex-wrap gap-3">

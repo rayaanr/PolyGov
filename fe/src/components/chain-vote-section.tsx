@@ -3,14 +3,6 @@
 import { useState, useMemo, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@/components/ui/select";
-import { Progress } from "@/components/ui/progress";
 import { useAccount } from "wagmi";
 import type { CombinedProposal } from "@/lib/types";
 import { MAIN_CONFIG } from "@/constants/config";
@@ -18,9 +10,9 @@ import { useVoteOnProposal } from "@/hooks/useVoteOnProposal";
 import { Skeleton } from "./ui/skeleton";
 import { useVotingPower } from "@/hooks/useVotingPower";
 import { useHasUserVoted } from "@/hooks/useHasUserVoted";
+import ProgressBar from "./ui/progress-bar";
+import { SINGLE_CHAIN_VOTING_POWER } from "@/constants/const";
 
-// Constants
-const TOTAL_TOKENS_PER_CHAIN = BigInt(10000 * 10 ** 18); // 10,000 tokens in 10^18 format
 const PENDING_STATUS = 0;
 
 // Extracted utility function for reuse
@@ -32,9 +24,6 @@ interface ChainVoteSectionProps {
 }
 
 export function ChainVoteSection({ proposal, id }: ChainVoteSectionProps) {
-    const [selectedChain, setSelectedChain] = useState<string>(
-        proposal.secondaryProposals[0]?.chainName || "main"
-    );
     const [voteType, setVoteType] = useState<boolean | null>(null);
     const [isVoting, setIsVoting] = useState(false);
 
@@ -123,30 +112,6 @@ export function ChainVoteSection({ proposal, id }: ChainVoteSectionProps) {
                 </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-                <div>
-                    <label className="text-sm font-medium mb-2 block">Select Chain</label>
-                    <Select value={selectedChain} onValueChange={setSelectedChain}>
-                        <SelectTrigger className="w-full md:w-[300px]">
-                            <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="main">
-                                <div className="flex items-center gap-2">
-                                    <div className="w-2 h-2 rounded-full bg-primary" />
-                                    <span>{MAIN_CONFIG.name}</span>
-                                </div>
-                            </SelectItem>
-                            {proposal.secondaryProposals.map((sp) => (
-                                <SelectItem key={sp.chainName} value={sp.chainName}>
-                                    <div className="flex items-center gap-2">
-                                        <div className="w-2 h-2 rounded-full bg-primary" />
-                                        <span>{sp.chainName}</span>
-                                    </div>
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                </div>
 
                 {/* Vote Selection */}
                 <div className="space-y-2">
@@ -191,63 +156,24 @@ export function ChainVoteSection({ proposal, id }: ChainVoteSectionProps) {
                 {/* Vote Breakdown for All Chains */}
                 <div className="space-y-4">
                     <h4 className="text-sm font-medium">Vote Breakdown by Chain</h4>
-                    <VoteBreakdown
-                        chainName={`${MAIN_CONFIG.name} (Main)`}
-                        yesVotes={BigInt(proposal.mainProposal.yesVotes)}
-                        noVotes={BigInt(proposal.mainProposal.noVotes)}
+                    <ProgressBar
+                        title={`${MAIN_CONFIG.name} (Main)`}
+                        yesVotes={Number(proposal.mainProposal.yesVotes / BigInt(10 ** 18))}
+                        noVotes={Number(proposal.mainProposal.noVotes / BigInt(10 ** 18))}
+                        maxVotingPower={SINGLE_CHAIN_VOTING_POWER}
                     />
                     {proposal.secondaryProposals.map((sp) => (
-                        <VoteBreakdown
-                            key={sp.chainName}
-                            chainName={sp.chainName}
-                            yesVotes={BigInt(sp.proposal.yesVotes)}
-                            noVotes={BigInt(sp.proposal.noVotes)}
-                        />
+               
+                            <ProgressBar
+                                key={sp.chainName}
+                                title={sp.chainName}
+                                yesVotes={Number(sp.proposal.yesVotes / BigInt(10 ** 18))}
+                                noVotes={Number(sp.proposal.noVotes / BigInt(10 ** 18))}
+                                maxVotingPower={SINGLE_CHAIN_VOTING_POWER}
+                            />
                     ))}
                 </div>
             </CardContent>
         </Card>
-    );
-}
-
-// Optimized VoteBreakdown component with memoization
-function VoteBreakdown({
-    chainName,
-    yesVotes,
-    noVotes,
-}: {
-    chainName: string;
-    yesVotes: bigint;
-    noVotes: bigint;
-}) {
-    // Memoize calculations
-    const { total, yesPercentage, noPercentage } = useMemo(() => {
-        const total = yesVotes + noVotes;
-        const yesPercentage = Number((yesVotes * BigInt(100)) / TOTAL_TOKENS_PER_CHAIN);
-        const noPercentage = Number((noVotes * BigInt(100)) / TOTAL_TOKENS_PER_CHAIN);
-
-        return { total, yesPercentage, noPercentage };
-    }, [yesVotes, noVotes]);
-
-    return (
-        <div className="space-y-2">
-            <div className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full" />
-                <span className="text-sm font-medium">{chainName}</span>
-                <span className="text-sm text-muted-foreground ml-auto">
-                    {formatTokenAmount(total)} tokens
-                </span>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-                <div className="space-y-1">
-                    <div className="text-xs">For ({formatTokenAmount(yesVotes)})</div>
-                    <Progress value={yesPercentage} className="h-1" />
-                </div>
-                <div className="space-y-1">
-                    <div className="text-xs">Against ({formatTokenAmount(noVotes)})</div>
-                    <Progress value={noPercentage} className="h-1" />
-                </div>
-            </div>
-        </div>
     );
 }
