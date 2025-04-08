@@ -11,6 +11,7 @@ import { ProposalSkeleton } from "./proposal-skeleton";
 import Image from "next/image";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "./ui/card";
 import { CalendarIcon, Clock } from "lucide-react";
+import { useIpfsData } from "@/hooks/useIpfsData";
 
 export function ProposalList() {
     const { combinedProposals, isLoading, error, totalCount } = useProposals();
@@ -55,6 +56,12 @@ function ProposalCard({ proposal }: { proposal: CombinedProposal }) {
     const { id, mainProposal, secondaryProposals } = proposal;
     const { yesPercentage, noPercentage } = useVoteStats(mainProposal, secondaryProposals);
 
+    const {
+        data: ipfsData,
+        isLoading: ipfsLoading,
+        error: ipfsError,
+    } = useIpfsData(mainProposal.ipfsHash);
+
     return (
         <Link
             key={id}
@@ -68,8 +75,12 @@ function ProposalCard({ proposal }: { proposal: CombinedProposal }) {
                             <CardTitle className="text-base font-medium">
                                 {mainProposal.title}
                             </CardTitle>
-                            <CardDescription className="line-clamp-2 mt-1 text-xs h-8">
-                                {mainProposal.ipfsHash}
+                            <CardDescription className="line-clamp-2 mt-1 text-xs h-8 break-words">
+                                {ipfsLoading
+                                    ? "Loading..."
+                                    : ipfsError
+                                    ? "Failed to load description"
+                                    : ipfsData?.description || mainProposal.ipfsHash}
                             </CardDescription>
                         </div>
                         <Badge

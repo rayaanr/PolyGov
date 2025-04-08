@@ -11,9 +11,16 @@ import useProposalById from "@/hooks/useProposalById";
 import { formatDate, getBadgeVariant, getStatusText } from "@/lib/utils";
 import useVoteStats from "@/hooks/useVoteStats";
 import { TOTAL_VOTING_POWER } from "@/constants/const";
+import { useIpfsData } from "@/hooks/useIpfsData";
 
 export default function ProposalDetails({ id }: { id: string }) {
     const { proposal, isLoading, error } = useProposalById(id);
+
+    const {
+        data: ipfsData,
+        isLoading: ipfsLoading,
+        error: ipfsError,
+    } = useIpfsData(proposal?.mainProposal.ipfsHash);
 
     if (isLoading) {
         return <ProposalDetailSkeleton />;
@@ -38,7 +45,11 @@ export default function ProposalDetails({ id }: { id: string }) {
                 <div>
                     <h1 className="text-2xl font-medium">{proposal.mainProposal.title}</h1>
                     <p className="text-sm text-muted-foreground mt-2">
-                        {proposal.mainProposal.ipfsHash}
+                        {ipfsLoading
+                            ? "Loading..."
+                            : ipfsError
+                            ? "Failed to load description"
+                            : ipfsData?.description || proposal.mainProposal.ipfsHash}
                     </p>
 
                     <div className="flex flex-wrap gap-4 mt-4">
