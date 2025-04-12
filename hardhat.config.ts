@@ -30,10 +30,6 @@ const config: HardhatUserConfig = {
         },
     },
     etherscan: {
-        apiKey: {
-            bscTestnet: process.env.BSCSCAN_API_KEY!,
-            arbitrumTestnet: "I2GDHYCNDURPR4U8JFYG3DN747QKUVXKM8",
-        },
         customChains: [
             {
                 network: "arbitrumTestnet",
