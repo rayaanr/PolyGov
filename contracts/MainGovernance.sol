@@ -3,7 +3,7 @@ pragma solidity ^0.8.28;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Votes.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 /**
  * @title MainGovernance
@@ -125,27 +125,18 @@ contract MainGovernance is Ownable, ReentrancyGuard {
 
     /// @notice Create a new proposal (anyone with sufficient voting power)
     function createProposal(
-        string memory _title,
-        string memory _ipfsHash,
-        uint256 _durationMinutes,
-        address[] memory _targets,
-        uint256[] memory _values,
-        bytes[] memory _calldatas
+        string memory _title, string memory _ipfsHash, uint256 _durationMinutes,
+        address[] memory _targets, uint256[] memory _values, bytes[] memory _calldatas
     ) external {
         require(_durationMinutes > minVotingDuration, "Duration too short");
-        require(
-            _targets.length == _values.length &&
-                _targets.length == _calldatas.length,
-            "Mismatched execution data"
-        );
+        require( _targets.length == _values.length && _targets.length == _calldatas.length,
+            "Mismatched execution data");
 
         uint256 votingPower = governanceToken.getVotes(msg.sender);
         require(votingPower >= minCreationPower, "Insufficient voting power");
 
         proposalNonce++;
-        bytes32 proposalId = keccak256(
-            abi.encodePacked(msg.sender, block.number, proposalNonce)
-        );
+        bytes32 proposalId = keccak256(abi.encodePacked(msg.sender, block.number, proposalNonce));
 
         Proposal storage newProposal = proposals[proposalId];
         newProposal.id = proposalId;
@@ -170,10 +161,7 @@ contract MainGovernance is Ownable, ReentrancyGuard {
         require(block.timestamp < proposal.endTime, "Voting period ended");
         require(!hasVoted[proposalId][msg.sender], "Already voted");
 
-        uint256 votingPower = governanceToken.getPastVotes(
-            msg.sender,
-            proposal.startTime
-        );
+        uint256 votingPower = governanceToken.getPastVotes(msg.sender,proposal.startTime);
         require(votingPower > 0, "No voting power");
 
         if (support) {
@@ -188,19 +176,14 @@ contract MainGovernance is Ownable, ReentrancyGuard {
 
     /// @notice Called by relayer to submit secondary chain votes (only for relayer)
     function collectSecondaryChainVotes(
-        bytes32 proposalId,
-        string memory chainId,
-        uint256 yesVotes,
-        uint256 noVotes
+        bytes32 proposalId, string memory chainId, uint256 yesVotes, uint256 noVotes
     ) external onlyRelayer {
         require(registeredChains[chainId], "Chain not registered");
         require(
-            block.timestamp >= proposals[proposalId].endTime,
-            "Voting period not ended"
+            block.timestamp >= proposals[proposalId].endTime, "Voting period not ended"
         );
         require(
-            !secondaryChainVotes[proposalId][chainId].collected,
-            "Votes already collected"
+            !secondaryChainVotes[proposalId][chainId].collected, "Votes already collected"
         );
 
         secondaryChainVotes[proposalId][chainId] = VoteSummary({
@@ -221,10 +204,8 @@ contract MainGovernance is Ownable, ReentrancyGuard {
     function finalizeProposalVotes(bytes32 proposalId) external nonReentrant {
         Proposal storage proposal = proposals[proposalId];
         if (proposal.startTime == 0) revert ProposalNotFound(proposalId);
-        if (block.timestamp < proposal.endTime)
-            revert("Voting period not ended");
-        if (proposal.voteTallyFinalized)
-            revert ProposalAlreadyFinalized(proposalId);
+        if (block.timestamp < proposal.endTime) revert("Voting period not ended");
+        if (proposal.voteTallyFinalized) revert ProposalAlreadyFinalized(proposalId);
 
         uint256 totalYesVotes = proposal.yesVotes;
         uint256 totalNoVotes = proposal.noVotes;
@@ -235,9 +216,7 @@ contract MainGovernance is Ownable, ReentrancyGuard {
                 revert VotesNotCollected(chainId);
             }
 
-            VoteSummary storage summary = secondaryChainVotes[proposalId][
-                chainId
-            ];
+            VoteSummary storage summary = secondaryChainVotes[proposalId][chainId];
             totalYesVotes += summary.yesVotes;
             totalNoVotes += summary.noVotes;
         }

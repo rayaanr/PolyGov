@@ -3,7 +3,7 @@ pragma solidity ^0.8.28;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Votes.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 /**
  * @title SecondaryGovernance
@@ -92,12 +92,8 @@ contract SecondaryGovernance is Ownable, ReentrancyGuard {
 
     /// @notice Mirror a proposal from the main chain
     function mirrorProposal(
-        bytes32 proposalId,
-        string memory _title,
-        string memory _ipfsHash,
-        uint256 _startTime,
-        uint256 _endTime,
-        address _proposer
+        bytes32 proposalId, string memory _title, string memory _ipfsHash,
+        uint256 _startTime, uint256 _endTime, address _proposer
     ) external onlyRelayer {
         if (proposals[proposalId].startTime > 0)
             revert ProposalAlreadyExists(proposalId);

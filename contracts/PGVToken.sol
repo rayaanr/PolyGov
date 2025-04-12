@@ -12,9 +12,6 @@ import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Votes.sol";
 contract PGVToken is ERC20, ERC20Permit, ERC20Votes {
     uint256 public constant MAX_SUPPLY = 10000 * 10 ** 18; // 10,000 tokens
 
-    // Custom error for clock inconsistency
-    error ERC6372InconsistentClock();
-
     constructor() ERC20("PolyGov Token", "PGV") ERC20Permit(name()) {
         _mint(msg.sender, MAX_SUPPLY);
     }
