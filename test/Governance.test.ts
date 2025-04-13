@@ -17,9 +17,6 @@ let user2Addr: string;
 
 // Constants
 const TOTAL_SUPPLY = ethers.parseEther("10000");
-const MIN_CREATION_POWER = ethers.parseEther("100");
-const QUORUM_VOTES = ethers.parseEther("1000");
-const MIN_VOTING_DURATION_MINUTES = 1;
 
 // Utility function to advance time
 async function advanceTime(seconds: number) {
@@ -119,10 +116,10 @@ describe("✅ MainGovernance Tests", function () {
     it("should revert if proposer has insufficient voting power", async () => {
         await pgvToken.connect(owner).transfer(user2Addr, ethers.parseEther("50"));
 
-        // Proposal creation with 2 minutes (not 1)
+        // Proposal creation
         await mainGov.connect(user1).createProposal("Valid Proposal", "ipfsHash", 2, [], [], []);
 
-        // Owner-only check (no reason match)
+        // Owner-only check 
         await expect(mainGov.connect(user1).updateRelayer(user2Addr)).to.be.reverted;
     });
 
@@ -399,7 +396,6 @@ describe("✅ End-to-End Flow", function () {
     });
 
     it("should reject proposal if quorum not reached", async () => {
-        // Important: set quorum higher to make rejection easier
         await mainGov.connect(owner).updateQuorum(ethers.parseEther("3000"));
 
         await mainGov.connect(user1).createProposal("Low Vote Proposal", "ipfsHash", 2, [], [], []);
@@ -505,7 +501,6 @@ describe("✅ End-to-End Flow", function () {
     });
 
     it("should revert if executing a rejected proposal", async () => {
-        // Important: set quorum higher to make rejection easier
         await mainGov.connect(owner).updateQuorum(ethers.parseEther("3000"));
 
         const newValue = "Rejected Proposal";
