@@ -36,6 +36,7 @@
         "name": "ProposalNotFound",
         "type": "error"
     },
+    { "inputs": [], "name": "ReentrancyGuardReentrantCall", "type": "error" },
     {
         "inputs": [{ "internalType": "bytes32", "name": "proposalId", "type": "bytes32" }],
         "name": "VoteNotFinalized",

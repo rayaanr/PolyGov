@@ -1,4 +1,4 @@
-export const arbABI = [
+export const secondaryABI = [
     {
         inputs: [
             { internalType: "address", name: "_token", type: "address" },
@@ -36,6 +36,7 @@ export const arbABI = [
         name: "ProposalNotFound",
         type: "error",
     },
+    { inputs: [], name: "ReentrancyGuardReentrantCall", type: "error" },
     {
         inputs: [{ internalType: "bytes32", name: "proposalId", type: "bytes32" }],
         name: "VoteNotFinalized",

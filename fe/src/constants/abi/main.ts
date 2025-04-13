@@ -48,6 +48,7 @@ export const mainABI = [
         name: "QuorumNotReached",
         type: "error",
     },
+    { inputs: [], name: "ReentrancyGuardReentrantCall", type: "error" },
     {
         inputs: [{ internalType: "string", name: "chainId", type: "string" }],
         name: "VotesNotCollected",

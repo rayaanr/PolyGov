@@ -1,5 +1,5 @@
 import { mainABI } from "@/constants/abi/main";
-import { arbABI } from "@/constants/abi/secondary";
+import { secondaryABI } from "@/constants/abi/secondary";
 import { bscTestnet, arbitrumSepolia} from "wagmi/chains";
 import { Abi } from "viem";
 
@@ -27,7 +27,7 @@ const CONFIG: {
         explorerUrl: arbitrumSepolia.blockExplorers?.default.url,
         contracts: {
             token: "0xc359f38eD76d8941d486dA85a4aA553Aa74b18BD",
-            governance: "0xe83DaE1FF22Af582e846BCBfD3bc9E4f965cB208",
+            governance: "0x2265d043c79caeca800be7ecc150c6c23d5e3374",
         },
         abi: {
             governance: mainABI as Abi,
@@ -41,10 +41,10 @@ const CONFIG: {
             explorerUrl: bscTestnet.blockExplorers?.default.url,
             contracts: {
                 token: "0xc359f38eD76d8941d486dA85a4aA553Aa74b18BD",
-                governance: "0x8Dfdc3D4837aa7cB73B664536Fb0557Af7C82c5d",
+                governance: "0x216941d5ce326edec59ffdf6959a1b855ee94276",
             },
             abi: {
-                governance: arbABI as Abi,
+                governance: secondaryABI as Abi,
             },
             icon: "/bsc.png",
         },
