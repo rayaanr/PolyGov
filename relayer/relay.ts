@@ -99,7 +99,7 @@ async function main() {
             saveProposalCache({ finalized: [], lastUpdate: Math.floor(Date.now() / 1000) });
         }
 
-        const { main, secondary, rawConnections } = await initializeConnections();
+        const { main, rawConnections } = await initializeConnections();
 
         setupWebSocketHealthCheck(rawConnections, {
             reconnectMain: async () => reconnectMainChain(rawConnections),

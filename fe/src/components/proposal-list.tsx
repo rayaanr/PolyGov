@@ -19,7 +19,15 @@ export function ProposalList() {
 
     if (isLoading) return <ProposalSkeleton />;
     if (error) return <div>Error: {error.message}</div>;
-    if (!totalCount) return <div>No proposals found</div>;
+    if (!totalCount)
+        return (
+            <div className="pt-36 text-center">
+                <h1 className="text-2xl font-semibold">No proposals found</h1>
+                <p className="text-sm text-muted-foreground">
+                    There are no proposals available at the moment.
+                </p>
+            </div>
+        );
 
     return (
         <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
@@ -84,7 +92,11 @@ function ProposalCard({ proposal }: { proposal: CombinedProposal }) {
                 </CardHeader>
                 <CardContent className="space-y-3 py-2 flex-grow">
                     <div className="space-y-3">
-                        <ProgressBar yesVotes={yes} noVotes={no} maxVotingPower={TOTAL_VOTING_POWER} />
+                        <ProgressBar
+                            yesVotes={yes}
+                            noVotes={no}
+                            maxVotingPower={TOTAL_VOTING_POWER}
+                        />
                     </div>
 
                     <div className="flex flex-wrap gap-3">

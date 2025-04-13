@@ -9,6 +9,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { MAIN_CONFIG } from "@/constants/config";
 import { CREATE_PROPOSAL_KEY } from "@/constants/keys";
+import useProposalIds from "./useProposalIds";
 
 export function useCreateProposal() {
     const { writeContractAsync, isPending, error, reset } = useWriteContract();
@@ -19,6 +20,7 @@ export function useCreateProposal() {
     const { switchChainAsync } = useSwitchChain();
     const { isConnected } = useAccount();
     const currentChainId = useChainId();
+    const { refetch: refershProposals } = useProposalIds();
 
     // Move the hook to the top level
     const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
@@ -75,6 +77,11 @@ export function useCreateProposal() {
         setHash(undefined); // Reset hash after success
         setIsSuccess(false); // Reset success state after success
         reset(); // Reset the transaction state
+
+        // wait for 5 seconds before refreshing
+        setTimeout(() => {
+            refershProposals();
+        }, 5000);
     }
 
     return {

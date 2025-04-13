@@ -12,6 +12,8 @@ import useVoteStats from "@/hooks/useVoteStats";
 import { TOTAL_VOTING_POWER } from "@/constants/const";
 import { useIpfsData } from "@/hooks/useIpfsData";
 import ProgressBar from "./ui/progress-bar";
+import Link from "next/link";
+import { MAIN_CONFIG } from "@/constants/config";
 
 export default function ProposalDetails({ id }: { id: string }) {
     const { proposal, isLoading, error } = useProposalById(id);
@@ -52,6 +54,17 @@ export default function ProposalDetails({ id }: { id: string }) {
                             : ipfsData?.description || proposal.mainProposal.ipfsHash}
                     </p>
 
+                    <h4 className="text-sm text-muted-foreground mt-2">
+                        Proposed by:&nbsp;
+                        <Link
+                            className="text-primary/80 hover:underline italic"
+                            href={`${MAIN_CONFIG.explorerUrl}/address/${proposal.mainProposal.proposer}`}
+                            target="_blank"
+                        >
+                            {proposal.mainProposal.proposer}
+                        </Link>
+                    </h4>
+
                     <div className="flex flex-wrap gap-4 mt-4">
                         <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
                             <CalendarIcon className="h-4 w-4" />
@@ -65,7 +78,10 @@ export default function ProposalDetails({ id }: { id: string }) {
                         </div>
                     </div>
                 </div>
-                <Badge variant={getBadgeVariant(proposal.mainProposal.status)} className="text-sm">
+                <Badge
+                    variant={getBadgeVariant(proposal.mainProposal.status)}
+                    className="text-sm rounded-full"
+                >
                     {getStatusText(proposal.mainProposal.status)}
                 </Badge>
             </div>
