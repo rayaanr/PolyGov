@@ -52,7 +52,21 @@ export const getBadgeVariant = (status: number): BadgeVariant => {
 // }
 
 export function encodeUpdateValueCalldata(title: string) {
-    const abi = ["function updateValue(string newValue)"];
-    const calldata = encodeFunctionData({ abi, functionName: "updateValue", args: [title] });
+    const abi = [
+        {
+            type: "function",
+            name: "updateValue",
+            inputs: [{ name: "newValue", type: "string" }],
+            outputs: [],
+            stateMutability: "nonpayable",
+        },
+    ];
+
+    const calldata = encodeFunctionData({
+        abi,
+        functionName: "updateValue",
+        args: [title],
+    });
+
     return calldata;
 }
