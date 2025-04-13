@@ -1,7 +1,9 @@
 import { HardhatUserConfig } from "hardhat/config";
 import "@nomicfoundation/hardhat-toolbox";
+import "@nomicfoundation/hardhat-ethers";
 import "@nomicfoundation/hardhat-ignition";
 import "dotenv/config";
+import "hardhat-coverage";
 
 const config: HardhatUserConfig = {
     solidity: {
@@ -11,7 +13,7 @@ const config: HardhatUserConfig = {
                 enabled: true,
                 runs: 200,
             },
-            viaIR: true,
+            viaIR: false,
         },
     },
     networks: {
@@ -28,10 +30,6 @@ const config: HardhatUserConfig = {
         },
     },
     etherscan: {
-        apiKey: {
-            bscTestnet: process.env.BSCSCAN_API_KEY!,
-            arbitrumTestnet: "I2GDHYCNDURPR4U8JFYG3DN747QKUVXKM8",
-        },
         customChains: [
             {
                 network: "arbitrumTestnet",
