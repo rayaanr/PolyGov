@@ -1,4 +1,4 @@
-import ProposalDetails from "@/components/test";
+import ProposalDetails from "@/components/proposal-details";
 
 export default async function ProposalPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = await params;
