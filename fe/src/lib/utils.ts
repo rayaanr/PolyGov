@@ -30,10 +30,10 @@ export function getStatusText(status: number): string {
 
 // Utility function (should be moved to utils file)
 const BADGE_VARIANTS = {
-    Active: "default",
+    Active: "info",
     Rejected: "destructive",
     Accepted: "success",
-    Executed: "success",
+    Executed: "default",
 } as const;
 
 // Type for badge variants
