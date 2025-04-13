@@ -3,7 +3,8 @@ import { CONFIG, MAIN_GOVERNANCE_ABI, SECONDARY_GOVERNANCE_ABI } from "../config
 import { createWebSocketProvider } from "./ws";
 import WebSocket from "ws";
 import { type ContractConnections } from "../types";
-import { setupMainChainEventListeners } from "..";
+import { setupMainChainListeners } from "../listeners/mainChainListeners";
+import { MainGovernance } from "../contracts/mainGov";
 
 export async function reconnectMainChain(connections: {
     main: ContractConnections;
@@ -13,11 +14,7 @@ export async function reconnectMainChain(connections: {
         await connections.main.provider.destroy();
         const mainProvider = createWebSocketProvider(CONFIG.MAIN.WS_URL);
         const mainSigner = new Wallet(process.env.RELAYER_PVT_KEY!, mainProvider);
-        const mainContract = new Contract(
-            CONFIG.MAIN.CONTRACT,
-            MAIN_GOVERNANCE_ABI,
-            mainSigner
-        );
+        const mainContract = new Contract(CONFIG.MAIN.CONTRACT, MAIN_GOVERNANCE_ABI, mainSigner);
 
         connections.main = {
             provider: mainProvider,
@@ -26,7 +23,7 @@ export async function reconnectMainChain(connections: {
             wsInstance: mainProvider.websocket as WebSocket,
         };
 
-        setupMainChainEventListeners(mainContract, connections.secondary);
+        setupMainChainListeners(new MainGovernance(mainContract), connections.secondary);
         console.log("✅ Successfully reconnected to main chain");
     } catch (error) {
         throw new Error(`Failed to reconnect to main chain: ${error}`);
@@ -46,11 +43,7 @@ export async function reconnectSecondaryChain(
         await connections.secondary[chainId].provider.destroy();
         const provider = createWebSocketProvider(chainConfig.WS_URL);
         const signer = new Wallet(process.env.RELAYER_PVT_KEY!, provider);
-        const contract = new Contract(
-            chainConfig.CONTRACT,
-            SECONDARY_GOVERNANCE_ABI,
-            signer
-        );
+        const contract = new Contract(chainConfig.CONTRACT, SECONDARY_GOVERNANCE_ABI, signer);
 
         connections.secondary[chainId] = {
             provider,
@@ -58,8 +51,7 @@ export async function reconnectSecondaryChain(
             signer,
             wsInstance: provider.websocket as WebSocket,
         };
-
-        setupMainChainEventListeners(connections.main.contract, {
+        setupMainChainListeners(new MainGovernance(connections.main.contract), {
             [chainId]: connections.secondary[chainId],
         });
 
@@ -68,4 +60,3 @@ export async function reconnectSecondaryChain(
         throw new Error(`Failed to reconnect to ${chainId} chain: ${error}`);
     }
 }
-
