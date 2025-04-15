@@ -36,12 +36,6 @@ const useProposalById = (proposalId: string) => {
         error: error1,
     } = useChainProposalDetails(secondaryChain1, [proposalId]);
 
-    // const {
-    //     proposals: proposals2,
-    //     isLoading: isLoading2,
-    //     error: error2,
-    // } = useChainProposalDetails(secondaryChain2, [proposalId]);
-
     const secondaryChains = [
         {
             proposals: proposals1,
@@ -50,13 +44,6 @@ const useProposalById = (proposalId: string) => {
             chainName: secondaryChain1.name,
             chainId: secondaryChain1.chainId,
         },
-        // {
-        //     proposals: proposals2,
-        //     isLoading: isLoading2,
-        //     error: error2,
-        //     chainName: secondaryChain2.name,
-        //     chainId: secondaryChain2.chainId,
-        // },
     ];
 
     useEffect(() => {

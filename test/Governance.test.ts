@@ -569,3 +569,5 @@ describe("✅ DemoContract Tests", function () {
         expect(await demoContract.lastUpdater()).to.equal(user1Addr);
     });
 });
+
+// This test cases are written with the help of LLMs

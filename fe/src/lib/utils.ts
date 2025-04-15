@@ -44,12 +44,6 @@ export const getBadgeVariant = (status: number): BadgeVariant => {
     return BADGE_VARIANTS[statusText as keyof typeof BADGE_VARIANTS] ?? "secondary";
 };
 
-// export function encodeUpdateValueCalldata(title: string) {
-//     const abi = ["function updateValue(string newValue)"];
-//     const iface = new Interface(abi);
-//     const calldata = iface.encodeFunctionData("updateValue", [title]);
-//     return calldata;
-// }
 
 export function encodeUpdateValueCalldata(title: string) {
     const abi = [
