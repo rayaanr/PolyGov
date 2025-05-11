@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef} from "react";
 import CONFIG, { MAIN_CONFIG } from "@/constants/config";
 import useChainProposalDetails from "./useChainProposalDetails";
 import { CombinedProposal, SecondaryProposal } from "@/lib/types";
@@ -13,6 +13,11 @@ const serializeBigInt = (obj: any) => {
 
 const useProposalById = (proposalId: string) => {
     const isFirstRender = useRef(true);
+    const [refetchCounter, setRefetchCounter] = useState(0);
+
+    const refetch = () => {
+        setRefetchCounter((prev) => prev + 1);
+    };
 
     const [result, setResult] = useState({
         proposal: null as CombinedProposal | null,
@@ -135,9 +140,15 @@ const useProposalById = (proposalId: string) => {
             }
             return prev;
         });
-    }, [proposalId, mainProposals, isLoadingMain, mainError, secondaryChains]);
+    }, [proposalId, mainProposals, isLoadingMain, mainError, secondaryChains, refetchCounter]);
 
-    return result;
+    return {
+        proposal: result.proposal,
+        isLoading: result.isLoading,
+        error: result.error,
+        result,
+        refetch,
+    };
 };
 
 export default useProposalById;

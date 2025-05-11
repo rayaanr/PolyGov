@@ -1,6 +1,4 @@
-"use client";
-
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useAccount } from "wagmi";
@@ -11,8 +9,11 @@ import { useVotingPower } from "@/hooks/useVotingPower";
 import { useHasUserVoted } from "@/hooks/useHasUserVoted";
 import ProgressBar from "./ui/progress-bar";
 import { SINGLE_CHAIN_VOTING_POWER } from "@/constants/const";
+import { useExecuteProposal } from "@/hooks/useExecuteProposal";
+import useProposalById from "@/hooks/useProposalById";
 
 const PENDING_STATUS = 0;
+const ACCEPTED_STATUS = 1;
 
 // Extracted utility function for reuse
 const formatTokenAmount = (amount: bigint) => (Number(amount) / 10 ** 18).toLocaleString();
@@ -25,18 +26,69 @@ interface ChainVoteSectionProps {
 export function ChainVoteSection({ proposal, id }: ChainVoteSectionProps) {
     const [voteType, setVoteType] = useState<boolean | null>(null);
     const [isVoting, setIsVoting] = useState(false);
+    const [transactionSuccessful, setTransactionSuccessful] = useState(false);
 
     const { isConnected } = useAccount();
     const { voteOnProposal, isPending } = useVoteOnProposal();
-    const { hasVoted, isLoading: isLoadingHasVoted } = useHasUserVoted(id);
+    const { refetch: refetchProposal } = useProposalById(id);
+    const {
+        hasVoted,
+        isLoading: isLoadingHasVoted,
+        refetch: refetchHasVoted,
+    } = useHasUserVoted(id);
     const {
         votingPower,
         isLoading: isLoadingVotingPower,
         error: votingPowerError,
     } = useVotingPower(id);
+    const { executeProposal } = useExecuteProposal();
 
     // Add a loading state indicator
-    const isLoading = isLoadingHasVoted || isLoadingVotingPower || isPending || isVoting;
+    const isLoading =
+        isLoadingHasVoted || isLoadingVotingPower || isPending || isVoting || transactionSuccessful;
+
+    // Effect to refetch voting status after transaction completes with retry logic
+    useEffect(() => {
+        if (transactionSuccessful) {
+            // Function to check vote status with retries
+            const checkVoteStatus = async (retries = 5, delay = 3000) => {
+                try {
+                    console.log("Checking vote status...");
+                    const result = await refetchHasVoted();
+
+                    // If vote is not yet recorded and we have retries left
+                    if (!result.data && retries > 0) {
+                        console.log(
+                            `Vote not yet confirmed. Retrying in ${
+                                delay / 1000
+                            }s... (${retries} attempts left)`
+                        );
+                        setTimeout(() => checkVoteStatus(retries - 1, delay), delay);
+                    } else if (result.data) {
+                        console.log("Vote confirmed!");
+                        refetchProposal();
+                        setTransactionSuccessful(false);
+                        setIsVoting(false); // Ensure voting state is reset
+                    } else {
+                        console.log("Max retries reached. Please check transaction status.");
+                        setTransactionSuccessful(false);
+                        setIsVoting(false); // Ensure voting state is reset even if max retries reached
+                    }
+                } catch (error) {
+                    console.error("Error checking vote status:", error);
+                    if (retries > 0) {
+                        setTimeout(() => checkVoteStatus(retries - 1, delay), delay);
+                    } else {
+                        setTransactionSuccessful(false);
+                        setIsVoting(false); // Ensure voting state is reset on error
+                    }
+                }
+            };
+
+            // Initial delay before first check (let blockchain catch up)
+            setTimeout(() => checkVoteStatus(), 2000);
+        }
+    }, [transactionSuccessful, refetchHasVoted]);
 
     // Check if voting is active based on status - memoized
     const isVotingActive = useMemo(
@@ -50,27 +102,41 @@ export function ChainVoteSection({ proposal, id }: ChainVoteSectionProps) {
 
         try {
             setIsVoting(true);
-            await voteOnProposal(id, voteType);
+            const tx = await voteOnProposal(id, voteType);
+
+            if (tx) {
+                setTransactionSuccessful(true);
+            } else {
+                setIsVoting(false);
+            }
         } catch (error) {
             console.error("Voting failed:", error);
-        } finally {
             setIsVoting(false);
         }
     }, [voteType, isConnected, hasVoted, voteOnProposal, id]);
 
-    // Enhance button state logic
+    // Enhanced button state logic
     const buttonState = useMemo(() => {
         if (!isConnected) {
             return { disabled: true, text: "Connect your wallet to vote" };
         }
-        if (isPending || isVoting) {
-            return {
-                disabled: true,
-                text: isPending ? "Confirming transaction..." : "Processing vote...",
-            };
+        if (isPending) {
+            return { disabled: true, text: "Confirming transaction..." };
+        }
+        if (proposal.mainProposal.status === ACCEPTED_STATUS) {
+            return { disabled: false, text: "Execute proposal" };
+        }
+        if (isVoting) {
+            return { disabled: true, text: "Processing vote..." };
+        }
+        if (transactionSuccessful) {
+            return { disabled: true, text: "Verifying vote..." };
         }
         if (isLoadingHasVoted) {
             return { disabled: true, text: "Checking vote status..." };
+        }
+        if (!isVotingActive) {
+            return { disabled: true, text: "Voting closed" };
         }
         if (hasVoted) {
             return { disabled: true, text: "You have already voted" };
@@ -84,9 +150,6 @@ export function ChainVoteSection({ proposal, id }: ChainVoteSectionProps) {
         if (votingPower === BigInt(0)) {
             return { disabled: true, text: "No voting power" };
         }
-        if (!isVotingActive) {
-            return { disabled: true, text: "Voting closed" };
-        }
         if (voteType === null) {
             return { disabled: true, text: "Select a vote option" };
         }
@@ -99,12 +162,13 @@ export function ChainVoteSection({ proposal, id }: ChainVoteSectionProps) {
         isConnected,
         isPending,
         isVoting,
+        transactionSuccessful,
         isLoadingHasVoted,
         hasVoted,
+        isVotingActive,
         isLoadingVotingPower,
         votingPowerError,
         votingPower,
-        isVotingActive,
         voteType,
     ]);
 
@@ -113,9 +177,7 @@ export function ChainVoteSection({ proposal, id }: ChainVoteSectionProps) {
             <Card>
                 <CardHeader>
                     <CardTitle>Cast Your Vote</CardTitle>
-                    <CardDescription>
-                        Select a chain to vote from and choose your voting option
-                    </CardDescription>
+                    <CardDescription>Select a voting option for this proposal</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
                     {/* Vote Selection */}
@@ -126,7 +188,7 @@ export function ChainVoteSection({ proposal, id }: ChainVoteSectionProps) {
                                 variant={voteType === true ? "success" : "outline"}
                                 onClick={() => setVoteType(true)}
                                 className="w-full"
-                                disabled={!isVotingActive || isLoading}
+                                disabled={!isVotingActive || isLoading || hasVoted}
                             >
                                 For
                             </Button>
@@ -134,7 +196,7 @@ export function ChainVoteSection({ proposal, id }: ChainVoteSectionProps) {
                                 variant={voteType === false ? "destructive" : "outline"}
                                 onClick={() => setVoteType(false)}
                                 className="w-full"
-                                disabled={!isVotingActive || isLoading}
+                                disabled={!isVotingActive || isLoading || hasVoted}
                             >
                                 Against
                             </Button>
@@ -158,7 +220,11 @@ export function ChainVoteSection({ proposal, id }: ChainVoteSectionProps) {
                         <Button
                             className="w-full relative"
                             disabled={buttonState.disabled}
-                            onClick={handleVote}
+                            onClick={
+                                proposal.mainProposal.status === ACCEPTED_STATUS
+                                    ? () => executeProposal(id)
+                                    : handleVote
+                            }
                         >
                             {isLoading && (
                                 <span className="absolute left-4 inline-block h-4 w-4 animate-spin rounded-full border-2 border-solid border-current border-r-transparent" />
@@ -174,7 +240,6 @@ export function ChainVoteSection({ proposal, id }: ChainVoteSectionProps) {
                 </CardContent>
             </Card>
 
-            {/* Vote Breakdown Card - Now Separate */}
             <Card>
                 <CardHeader>
                     <CardTitle>Vote Breakdown</CardTitle>

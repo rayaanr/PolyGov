@@ -18,7 +18,7 @@ export function useHasUserVoted(proposalId: string) {
         })();
 
     // Execute contract read
-    const { data, isLoading, isError, error } = useReadContract({
+    const { data, isLoading, isError, error, refetch } = useReadContract({
         address: config.config.contracts.governance as Address,
         abi: config.config.abi.governance,
         functionName: ALREADY_VOTED_KEY,
@@ -26,10 +26,15 @@ export function useHasUserVoted(proposalId: string) {
         chainId: config.chain.id,
     });
 
+    console.log("useHasUserVoted", {
+        data,
+    });
+
     return {
         hasVoted: data as boolean | undefined,
         isLoading,
         isError,
         error,
+        refetch,
     };
 }

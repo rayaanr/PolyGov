@@ -3,3 +3,4 @@ export const TOTAL_VOTING_POWER = 20000;
 export const SINGLE_CHAIN_VOTING_POWER = 10000;
 export const QUORUM = 1000
 export const MAX_PROPOSALS = 10;
+export const EXEUTING_CONTRACT = "0x54DccD4b6dca0a13767A17899E706911Cdf8D106";

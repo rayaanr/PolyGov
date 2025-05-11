@@ -27,6 +27,7 @@ import * as z from "zod";
 import { PlusIcon } from "lucide-react";
 import { useCreateProposal } from "@/hooks/useCreateProposal";
 import { encodeUpdateValueCalldata } from "@/lib/utils";
+import { EXEUTING_CONTRACT } from "@/constants/const";
 
 const MIN_DURATION = 3; // Minimum duration in minutes
 const MAX_DURATION = 1440; // Maximum duration in minutes
@@ -42,8 +43,6 @@ const formSchema = z.object({
         .max(MAX_DURATION, `Maximum duration is ${MAX_DURATION} minutes`),
 });
 
-// Contract constants moved outside component
-const EXEUTING_CONTRACT = "0x54DccD4b6dca0a13767A17899E706911Cdf8D106";
 const DURATION_PRESETS = [
     { value: MIN_DURATION, label: `${MIN_DURATION} min` },
     { value: 60, label: "1 hr" },

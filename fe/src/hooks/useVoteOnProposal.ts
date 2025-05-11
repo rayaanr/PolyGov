@@ -8,7 +8,7 @@ import { type Address, type Hash } from "viem";
 
 export const SUPPORTED_CHAINS: Record<number, { chain: Chain; config: any }> = {
     [bscTestnet.id]: { chain: bscTestnet, config: CONFIG.SECONDARY_CHAINS[0] },
-    [arbitrumSepolia.id]: { chain: arbitrumSepolia, config:  MAIN_CONFIG },
+    [arbitrumSepolia.id]: { chain: arbitrumSepolia, config: MAIN_CONFIG },
 };
 
 export function useVoteOnProposal() {
@@ -36,7 +36,14 @@ export function useVoteOnProposal() {
                 });
 
                 reset();
-                toast.success("Vote submitted!", { description: `Tx: ${hash}` });
+                toast.success("Vote cast successfully!", {
+                    action: {
+                        label: "View on Explorer",
+                        onClick: () => {
+                            window.open(`${config.explorerUrl}/tx/${hash}`, "_blank");
+                        },
+                    },
+                });
                 return hash;
             } catch (err) {
                 const msg = err instanceof Error ? err.message : "Unknown error";
