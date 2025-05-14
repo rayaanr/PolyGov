@@ -83,7 +83,7 @@ function scheduleRecurringTasks(
 ) {
     setInterval(async () => {
         await processEndedProposals(mainGov, secondaryConnections);
-    }, 2 * 60 * 1000); // Every 2 minutes
+    }, 0.5 * 60 * 1000); // Every 30 seconds
 
     setInterval(async () => {
         await syncProposalsBetweenChains(mainGov, secondaryConnections);
