@@ -13,23 +13,6 @@
 
 </div>
 
-## 📋 Table of Contents
-
-- [Overview](#overview)
-- [Research Background](#research-background)
-- [Architecture](#architecture)
-- [Key Features](#key-features)
-- [Smart Contracts](#smart-contracts)
-- [Relayer System](#relayer-system)
-- [Frontend Application](#frontend-application)
-- [Installation & Setup](#installation--setup)
-- [Usage](#usage)
-- [Testing](#testing)
-- [Deployment](#deployment)
-- [Configuration](#configuration)
-- [API Reference](#api-reference)
-- [Contributing](#contributing)
-- [License](#license)
 
 ## 🔍 Overview
 
@@ -39,28 +22,136 @@ The platform leverages a sophisticated relayer system to synchronize proposals a
 
 ## 🔬 Research Background
 
-*[This section will be populated with details from your thesis. Please add the following information:]*
+### Problem Domain
+
+Governance refers to the process of making decisions within a group, organization, or community. In traditional systems, especially within financial institutions, governance typically operates under formal hierarchies with centralized authority, leading to slow and complicated decision-making processes with limited transparency and accountability.
+
+#### Limitations of Traditional Governance
+- **Centralized Control**: Decision-making power rests with selected individuals, reducing inclusiveness
+- **Rigid Structures**: Hierarchical models fail to accommodate fast-paced digital environments
+- **Lack of Transparency**: Limited visibility into decision-making processes
+- **Agency Problems**: Conflicts of interest difficult to resolve within hierarchical systems
+
+#### Emergence of Blockchain Governance
+
+Blockchain technology offers decentralized alternatives through:
+- **Decentralized Autonomous Organizations (DAOs)**: Smart contract-based automated decision-making
+- **Token-Based Voting**: Community participation through governance tokens
+- **Transparency**: All decisions recorded immutably on-chain
+- **Algorithmic Trust**: Trust in code rather than intermediaries
 
 ### Problem Statement
-- *Details about the challenges in cross-chain governance*
-- *Current limitations in existing solutions*
-- *Research objectives and hypotheses*
 
-### Methodology
-- *Research approach and methodologies used*
-- *Experimental design and testing frameworks*
-- *Performance metrics and evaluation criteria*
+**Current multi-chain governance systems lack automation, scalability, and reusable smart contracts, resulting in inefficient and complex cross-chain decision-making processes.**
 
-### Literature Review
-- *Related work in cross-chain governance*
-- *Comparative analysis with existing solutions*
-- *Technical innovations and contributions*
+#### Key Challenges Identified
 
-### Results and Analysis
-- *Key findings from your research*
-- *Performance benchmarks*
-- *Security analysis results*
-- *Scalability measurements*
+1. **Single-Chain Limitations**:
+   - Governance centralization among large token holders
+   - Low voter participation due to high transaction fees
+   - Lack of interoperability across blockchain networks
+   - System complexity requiring technical expertise
+
+2. **Multi-Chain Governance Gaps**:
+   - Manual deployment overhead for each proposal
+   - Scalability constraints with multiplicative contract deployments
+   - Lack of reusable smart contract architectures
+   - Security vulnerabilities in smaller blockchain projects
+
+### Literature Review & Existing Solutions
+
+#### Single-Chain Governance Analysis
+
+Major DeFi protocols demonstrate both strengths and limitations:
+
+**Uniswap Governance**:
+- ✅ Full on-chain transparency and liquid democracy
+- ❌ Less than 10% token participation, top 10 holders control 44.72% voting power
+- ❌ High Ethereum gas fees discourage smaller holders
+
+**Compound Protocol**:
+- ✅ Structured decision-making with timelocks and quorum thresholds
+- ❌ As few as three voters can control 50% of decisions
+- ❌ Significant centralization issues persist
+
+**Aave Protocol**:
+- ✅ Dual-token system with staking rewards
+- ✅ Multi-chain deployments
+- ❌ Complex governance structure with steep learning curve
+- ❌ Ethereum-centric decisions limit true interoperability
+
+#### Multi-Chain Governance Research
+
+**MULTAV Framework (Fan, Chai & Zhong, 2020)**:
+The only significant research addressing multi-chain governance voting, but with critical limitations:
+
+- **Manual Deployment Overhead**: Each proposal requires new smart contracts across all chains
+- **Scalability Issues**: O(m×n) complexity where m=proposals, n=blockchains
+- **No Reusable Components**: Complete contract redeployment for each proposal
+- **High Gas Costs**: Multiplicative cost increases with network expansion
+
+### Research Contributions & Innovation
+
+PolyGov addresses the identified gaps through:
+
+#### 1. Automated Cross-Chain Synchronization
+- **Relayer-Based Architecture**: Eliminates manual deployment overhead
+- **Event-Driven Mirroring**: Automatic proposal replication across chains
+- **Real-Time Vote Aggregation**: Seamless collection of votes from all networks
+
+#### 2. Scalable Smart Contract Design
+- **Reusable Governance Contracts**: Single deployment supports multiple proposals
+- **Modular Architecture**: Upgradeable and maintainable contract system
+- **Efficient Resource Usage**: Reduced gas costs and storage requirements
+
+#### 3. Enhanced Security Framework
+- **Trusted Relayer System**: Cryptographic verification of cross-chain messages
+- **Reentrancy Protection**: Comprehensive security measures
+- **Access Control**: Role-based permissions for governance operations
+
+#### 4. User Experience Improvements
+- **Unified Interface**: Single dashboard for multi-chain governance
+- **Auto-Delegation**: Automatic vote delegation for improved participation
+- **Real-Time Updates**: Live status tracking across all networks
+
+### Technical Foundation
+
+#### Cross-Chain Communication
+
+After evaluating multiple approaches, **relayer mechanisms** were selected as optimal for multi-chain governance:
+
+- **Notary Mechanisms**: Trusted intermediaries (too centralized)
+- **Sidechains**: Limited to primary chain ecosystems
+- **Hash-Locking**: Requires synchronous participation (not suitable)
+- **Relay Systems**: ✅ Best balance of decentralization, efficiency, and compatibility
+
+#### Voting Mechanisms Implemented
+
+1. **Token-Weighted Voting**: Standard governance token approach
+2. **Timestamp-Based Snapshots**: Consistent voting power across chains
+3. **Delegated Voting**: Liquid democracy with flexible delegation
+4. **Quorum Requirements**: Configurable thresholds for proposal validity
+
+### Evaluation Framework
+
+The system is evaluated against established criteria:
+
+1. **Security & Vulnerability**: Formal verification and comprehensive audits
+2. **Voting Power Distribution**: Analysis of centralization vs. decentralization
+3. **Fairness & Accuracy**: Correct implementation of governance rules
+4. **Transparency & Auditability**: Full on-chain visibility
+5. **Efficiency & Cost**: Gas optimization and scalability metrics
+6. **Upgradability**: Future-proof governance evolution
+
+### Research Impact
+
+This work contributes to the blockchain governance domain by:
+
+- **Solving Scalability**: First automated multi-chain governance framework
+- **Reducing Complexity**: Eliminating manual deployment overhead
+- **Enhancing Security**: Distributed authority across multiple chains
+- **Improving Accessibility**: Lower barriers to cross-chain participation
+- **Advancing Interoperability**: Seamless governance across blockchain ecosystems
 
 ## 🏗️ Architecture
 
